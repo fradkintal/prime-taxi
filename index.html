@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>פריים טקסי | PRIME TAXI — מוניות לנתב״ג, נסיעות בינעירוניות ומשלוחים 24/7</title>
+  <meta name="description" content="מחשבון מחירים שקוף והזמנת מונית בקליק ל-WhatsApp: מוניות ספיישל לנתב״ג ומנתב״ג, נסיעות בינעירוניות מעיר לעיר ומשלוחים מהירים בכל הארץ במחיר קבוע וידוע מראש." />
+  <meta name="theme-color" content="#070b14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PRIME TAXI" />
+  <link rel="icon" type="image/jpeg" href="./public/assets/logo-modern.jpg" />
+  <link rel="apple-touch-icon" href="./public/assets/logo-modern.jpg" />
+
+  <!-- Google Fonts: Heebo & Rubik -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Custom Luxury Theme Styles -->
+  <link rel="stylesheet" href="./src/styles.css?v=1.1.0" />
+</head>
+<body class="min-h-screen flex flex-col bg-slate-100 text-slate-900 selection:bg-amber-400 selection:text-slate-950">
+
+  <!-- Top Sticky Header -->
+  <header id="appHeader" class="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-amber-500/25 shadow-lg"></header>
+
+  <!-- Main Dynamic Content -->
+  <main id="appMain" class="flex-1"></main>
+
+  <!-- Footer -->
+  <footer class="bg-slate-950 text-slate-400 border-t border-slate-800 py-10 pb-24 lg:pb-10">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6 pb-6 border-b border-slate-800/80">
+        <div class="flex items-center gap-3.5">
+          <img src="./public/assets/logo-modern.jpg" alt="PRIME TAXI" class="w-11 h-11 rounded-2xl object-cover border border-amber-400/60 shadow-md" />
+          <div>
+            <div class="font-black text-white text-base">פריים טקסי | PRIME TAXI ISRAEL</div>
+            <div class="text-xs text-slate-400">מוניות ספיישל לנתב״ג • נסיעות בינעירוניות • משלוחים אקספרס • 24/7</div>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-3 text-xs font-bold">
+          <button onclick="window.primeApp.setView('booking')" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:text-amber-400 transition">🚕 מחשבון הזמנה</button>
+          <button onclick="window.primeApp.setView('pricelist')" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:text-amber-400 transition">📋 מחירון 78 ערים</button>
+          <button onclick="window.primeApp.openAuthModal()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:text-amber-400 transition">🔐 התחברות / אזור אישי</button>
+          <button onclick="window.primeApp.setView('admin')" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 hover:bg-slate-800 transition">⚡ ממשק ניהול (טל ואליהו)</button>
+        </div>
+      </div>
+      <div class="pt-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+        <div>כל הזכויות שמורות © 2026 פריים טקסי (PRIME TAXI) — ניהול ותפעול: טל פרדקין (054-6373001) ואליהו (050-7676946)</div>
+        <div class="flex items-center gap-2">
+          <span class="px-2.5 py-0.5 rounded bg-slate-900 text-amber-400 font-mono font-bold border border-slate-800">v1.1.0</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal & Toast Containers -->
+  <div id="modalRoot"></div>
+  <div id="toastContainer" class="fixed bottom-6 left-6 z-50 flex flex-col gap-2 max-w-sm"></div>
+
+  <!-- Pricing Database & Application Engine -->
+  <script src="./src/pricing-data.js?v=1.1.0"></script>
+  <script src="./src/app.js?v=1.1.0"></script>
+</body>
+</html>

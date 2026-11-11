@@ -1,0 +1,128 @@
+name: Deploy PRIME TAXI (GitHub Pages + AWS S3/CloudFront + Firebase)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "prime-taxi-deploy"
+  cancel-in-progress: true
+
+env:
+  AWS_ACCOUNT_ID: '714303613666'
+  AWS_REGION: 'il-central-1'
+  FIREBASE_PROJECT_ID: 'tlator-759c6'
+
+jobs:
+  build-and-deploy-pages:
+    name: Build & Deploy to GitHub Pages (Live URL)
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify JS syntax
+        run: npm run check
+
+      - name: Build production bundle (dist/)
+        run: npm run build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  deploy-aws:
+    name: Deploy to AWS S3 + CloudFront (il-central-1 / eu-west-1)
+    needs: build-and-deploy-pages
+    if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || env.AWS_REGION }}
+
+      - name: Upload static assets to S3 (immutable cache)
+        run: |
+          aws s3 cp dist/ s3://${{ vars.AWS_S3_BUCKET }}/ \
+            --recursive \
+            --exclude "index.html" \
+            --exclude "version.json" \
+            --cache-control "public,max-age=31536000,immutable"
+
+      - name: Upload index.html and version.json (no-cache)
+        run: |
+          aws s3 cp dist/index.html s3://${{ vars.AWS_S3_BUCKET }}/index.html \
+            --cache-control "no-cache,no-store,must-revalidate"
+          aws s3 cp dist/version.json s3://${{ vars.AWS_S3_BUCKET }}/version.json \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --content-type "application/json"
+
+      - name: Invalidate CloudFront distribution
+        if: vars.AWS_CLOUDFRONT_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ vars.AWS_CLOUDFRONT_ID }} \
+            --paths "/*"
+
+  deploy-firebase:
+    name: Deploy to Firebase Hosting (tlator-759c6)
+    needs: build-and-deploy-pages
+    if: github.ref == 'refs/heads/main' && vars.FIREBASE_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: ${{ env.FIREBASE_PROJECT_ID }}

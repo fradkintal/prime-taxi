@@ -1,0 +1,18 @@
+{
+  "name": "prime-taxi",
+  "version": "1.2.0",
+  "private": true,
+  "description": "PRIME TAXI (פריים טקסי) — מערכת הזמנות מוניות ארצית, מחשבון נתב״ג ובינעירוני, סדרן WhatsApp וגזירת עמלות בביט ופייבוקס (טל פרדקין ואליהו)",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js && node --check src/pricing-data.js && node --check src/app.js",
+    "build": "node scripts/build-dist.js",
+    "release": "node scripts/bump-version.js --patch && node scripts/build-dist.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fradkintal/prime-taxi.git"
+  },
+  "author": "Tal Fradkin (054-6373001) & Eliyahu (050-7676946)"
+}
