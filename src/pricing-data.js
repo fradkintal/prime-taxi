@@ -29,7 +29,7 @@ window.PRIME_TAXI_DATA = {
     greenApiInstanceId: '',
     greenApiToken: '',
     customSmsWebhookUrl: '',
-    cloudApiUrl: ''
+    cloudApiUrl: 'https://lineqcewjmyzccqlxidpxx4fme0xsryh.lambda-url.eu-central-1.on.aws/'
   },
 
   // שותפים ומנהלי מערכת ראשיים (הרשאה מלאה להכל)
