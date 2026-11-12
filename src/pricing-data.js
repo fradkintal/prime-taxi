@@ -9,6 +9,7 @@ window.PRIME_TAXI_DATA = {
     brandSlogan: 'הסטנדרט החדש של מוניות לנתב״ג, נסיעות בינעירוניות ומשלוחים בישראל',
     logoStyle: 'modern', // 'modern' (לוגו גיאומטרי כברירת מחדל) | 'crest'
     activePartnerId: 'tal', // 'tal' | 'eliyahu'
+    dispatcherPhone: '054-6373001',
     whatsappPhone: '054-6373001',
     whatsappIntl: '972546373001',
     partnerPhone: '050-7676946',
@@ -25,9 +26,10 @@ window.PRIME_TAXI_DATA = {
     roundTripDiscountPct: 10,
     globalPriceMultiplier: 1.0,
     otpGatewayMode: 'green_api_whatsapp', // 'green_api_whatsapp' | 'elgarasi_sms' | 'firebase_free'
-    greenApiIdInstance: '',
+    greenApiInstanceId: '',
     greenApiToken: '',
-    smsWebhookUrl: ''
+    customSmsWebhookUrl: '',
+    cloudApiUrl: ''
   },
 
   // שותפים ומנהלי מערכת ראשיים (הרשאה מלאה להכל)
@@ -40,7 +42,11 @@ window.PRIME_TAXI_DATA = {
       phone: '054-6373001',
       cleanPhone: '0546373001',
       intlPhone: '972546373001',
-      usernames: ['tal', 'טל', 'papoosh', 'פפוש', '0546373001'],
+      bitPhone: '054-6373001',
+      payboxPhone: '054-6373001',
+      username: 'טל',
+      usernames: ['tal', 'טל', 'papoosh', 'פפוש', '0546373001', '054-6373001'],
+      masterPin: '1234',
       quickPin: '1234'
     },
     {
@@ -51,8 +57,71 @@ window.PRIME_TAXI_DATA = {
       phone: '050-7676946',
       cleanPhone: '0507676946',
       intlPhone: '972507676946',
-      usernames: ['eliyahu', 'אליהו', 'eli', 'אלי', '0507676946'],
+      bitPhone: '050-7676946',
+      payboxPhone: '050-7676946',
+      username: 'אליהו',
+      usernames: ['eliyahu', 'אליהו', 'eli', 'אלי', '0507676946', '050-7676946'],
+      masterPin: '1234',
       quickPin: '1234'
+    }
+  ],
+
+  defaultDrivers: [
+    {
+      id: 'drv-101',
+      name: 'יוסי לוי',
+      phone: '052-8441920',
+      vehicleTierId: 'sedan',
+      vehicleName: 'מרצדס E-Class מונית סדאן',
+      plateNumber: '84-291-26',
+      region: 'נתב״ג וגוש דן',
+      status: 'available_airport', // 'available_airport' | 'available' | 'busy' | 'offline'
+      statusLabel: '✈️ ממתין עכשיו בנתב״ג (טרמינל 3)',
+      completedRides: 42,
+      totalCommissionsPaid: 1180,
+      rating: 4.95
+    },
+    {
+      id: 'drv-102',
+      name: 'דוד אברהם',
+      phone: '050-9114823',
+      vehicleTierId: 'van7',
+      vehicleName: 'מרצדס V-Class VIP (7 מקומות)',
+      plateNumber: '39-882-04',
+      region: 'ירושלים ונתב״ג',
+      status: 'available',
+      statusLabel: '🟢 פנוי לנסיעות (ירושלים / נתב״ג)',
+      completedRides: 31,
+      totalCommissionsPaid: 1640,
+      rating: 4.98
+    },
+    {
+      id: 'drv-103',
+      name: 'שמעון מזרחי',
+      phone: '054-3329104',
+      vehicleTierId: 'van6',
+      vehicleName: 'מונית גדולה 6 מקומות + תא מטען ענק',
+      plateNumber: '55-710-26',
+      region: 'גוש דן והשרון',
+      status: 'available',
+      statusLabel: '🟢 פנוי לנסיעות (תל אביב / השרון)',
+      completedRides: 27,
+      totalCommissionsPaid: 990,
+      rating: 4.92
+    },
+    {
+      id: 'drv-104',
+      name: 'אבי ביטון',
+      phone: '053-7741209',
+      vehicleTierId: 'minibus10',
+      vehicleName: 'מיניבוס מרצדס ספרינטר (10-14 מקומות)',
+      plateNumber: '91-402-01',
+      region: 'כל הארץ ונתב״ג',
+      status: 'available_airport',
+      statusLabel: '✈️ פנוי בנתב״ג לקבוצות ומשפחות',
+      completedRides: 19,
+      totalCommissionsPaid: 1420,
+      rating: 5.0
     }
   ],
 

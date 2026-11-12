@@ -7,6 +7,8 @@
   const STORAGE_KEYS = {
     SETTINGS: 'prime_taxi_settings_v2',
     ORDERS: 'prime_taxi_orders_v1',
+    DRIVERS: 'prime_taxi_drivers_v1',
+    ACTIVE_DRIVER: 'prime_taxi_active_driver_v1',
     CITY_OVERRIDES: 'prime_taxi_city_overrides_v1',
     AUTH_USER: 'prime_taxi_auth_user_v1'
   };
@@ -15,13 +17,18 @@
   let settings = loadSettings();
   let cityOverrides = loadCityOverrides();
   let orders = loadOrders();
+  let drivers = loadDrivers();
+  let activeDriver = loadActiveDriver();
   let currentUser = loadAuthUser();
 
   let state = {
-    activeView: 'booking', // 'booking' | 'pricelist' | 'admin'
-    adminTab: 'orders',    // 'orders' | 'pricing' | 'branding' | 'auth_servers'
-    authMode: 'phone_otp', // 'phone_otp' | 'username_pin'
-    authStep: 'input',     // 'input' | 'verify_otp'
+    activeView: detectInitialView(), // 'booking' | 'driver' | 'pricelist' | 'admin'
+    adminTab: 'orders',    // 'orders' | 'drivers' | 'analytics' | 'pricing' | 'branding' | 'auth_servers'
+    driverFilter: 'all',   // 'all' | 'airport' | 'intercity' | 'delivery' | 'my_rides'
+    cloudStatus: 'connected', // 'connected' | 'syncing' | 'local'
+    lastCloudSyncAt: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+    authMode: 'phone_otp',
+    authStep: 'input',
     authPhoneInput: '',
     authNameInput: '',
     authUsernameInput: '',
@@ -88,10 +95,97 @@
     return `${hh}:${mm}`;
   }
 
+  function detectInitialView() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('view');
+      if (v === 'driver' || v === 'admin' || v === 'pricelist' || v === 'booking') return v;
+      const host = (window.location.hostname || '').toLowerCase();
+      if (host.includes('d2gkypncorjpuw')) return 'driver';
+      if (host.includes('d1qjhe0ijgnja3')) return 'admin';
+    } catch (e) {}
+    return 'booking';
+  }
+
+  function getCloudApiUrl() {
+    return (settings && settings.cloudApiUrl) || (DATA.defaultSettings && DATA.defaultSettings.cloudApiUrl) || '';
+  }
+
+  async function syncWithAwsCloud(silent = true) {
+    const apiUrl = getCloudApiUrl();
+    if (!apiUrl) return;
+    try {
+      if (!silent) state.cloudStatus = 'syncing';
+      const res = await fetch(apiUrl, { method: 'GET' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.ok && data.state) {
+        let changed = false;
+        if (Array.isArray(data.state.orders) && data.state.orders.length > 0) {
+          const newOrdersJson = JSON.stringify(data.state.orders);
+          if (newOrdersJson !== JSON.stringify(orders)) {
+            orders = data.state.orders;
+            localStorage.setItem(STORAGE_KEYS.ORDERS, newOrdersJson);
+            changed = true;
+          }
+        }
+        if (Array.isArray(data.state.drivers) && data.state.drivers.length > 0) {
+          const newDriversJson = JSON.stringify(data.state.drivers);
+          if (newDriversJson !== JSON.stringify(drivers)) {
+            drivers = data.state.drivers;
+            localStorage.setItem(STORAGE_KEYS.DRIVERS, newDriversJson);
+            changed = true;
+          }
+        }
+        if (data.state.settings && typeof data.state.settings === 'object') {
+          settings = { ...settings, ...data.state.settings };
+          localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+        }
+        if (data.state.cityOverrides && typeof data.state.cityOverrides === 'object') {
+          cityOverrides = { ...cityOverrides, ...data.state.cityOverrides };
+          localStorage.setItem(STORAGE_KEYS.CITY_OVERRIDES, JSON.stringify(cityOverrides));
+        }
+        state.cloudStatus = 'connected';
+        state.lastCloudSyncAt = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        if (changed || !silent) renderAll();
+      }
+    } catch (e) {
+      state.cloudStatus = 'local';
+    }
+  }
+
+  async function pushToAwsCloud(payload = {}) {
+    const apiUrl = getCloudApiUrl();
+    if (!apiUrl) return;
+    try {
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orders,
+          drivers,
+          settings,
+          cityOverrides,
+          ...payload
+        })
+      });
+      if (res.ok) {
+        state.cloudStatus = 'connected';
+        state.lastCloudSyncAt = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+    } catch (e) {}
+  }
+
   function loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      if (raw) return { ...DATA.defaultSettings, ...JSON.parse(raw) };
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (DATA.defaultSettings.cloudApiUrl && !parsed.cloudApiUrl) {
+          parsed.cloudApiUrl = DATA.defaultSettings.cloudApiUrl;
+        }
+        return { ...DATA.defaultSettings, ...parsed };
+      }
     } catch (e) {}
     return { ...DATA.defaultSettings };
   }
@@ -115,6 +209,7 @@
         localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
       }
     } catch (e) {}
+    renderAll();
   }
 
   function isSuperAdminUser(user) {
@@ -126,7 +221,9 @@
     const clean = String(inputStr || '').trim().toLowerCase();
     const digits = clean.replace(/\D/g, '');
     const normDigits = digits.startsWith('972') ? '0' + digits.slice(3) : digits;
-    return (DATA.owners || []).find(o =>
+    const allOwners = DATA.owners || settings.owners || [];
+    return allOwners.find(o =>
+      o.id === clean ||
       o.cleanPhone === normDigits ||
       (o.usernames && o.usernames.some(u => u.toLowerCase() === clean))
     );
@@ -137,11 +234,7 @@
     try {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
     } catch (e) {}
-    fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings)
-    }).catch(() => {});
+    pushToAwsCloud({ settings });
     renderAll();
   }
 
@@ -158,7 +251,53 @@
     try {
       localStorage.setItem(STORAGE_KEYS.CITY_OVERRIDES, JSON.stringify(cityOverrides));
     } catch (e) {}
+    pushToAwsCloud({ cityOverrides });
     renderAll();
+  }
+
+  function loadDrivers() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.DRIVERS);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    const seed = DATA.defaultDrivers ? [...DATA.defaultDrivers] : [];
+    try {
+      localStorage.setItem(STORAGE_KEYS.DRIVERS, JSON.stringify(seed));
+    } catch (e) {}
+    return seed;
+  }
+
+  function saveDrivers(singleDriver = null) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.DRIVERS, JSON.stringify(drivers));
+    } catch (e) {}
+    if (singleDriver) {
+      pushToAwsCloud({ action: 'upsert_driver', driver: singleDriver });
+    } else {
+      pushToAwsCloud({ drivers });
+    }
+  }
+
+  function loadActiveDriver() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEYS.ACTIVE_DRIVER);
+      if (raw) return JSON.parse(raw);
+    } catch (e) {}
+    return (DATA.defaultDrivers && DATA.defaultDrivers[0]) || null;
+  }
+
+  function saveActiveDriver(drv) {
+    activeDriver = drv;
+    try {
+      if (drv) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_DRIVER, JSON.stringify(drv));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_DRIVER);
+      }
+    } catch (e) {}
   }
 
   function getSeedOrders() {
@@ -250,15 +389,15 @@
     return seed;
   }
 
-  function saveOrders() {
+  function saveOrders(singleOrder = null) {
     try {
       localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
     } catch (e) {}
-    fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orders)
-    }).catch(() => {});
+    if (singleOrder) {
+      pushToAwsCloud({ action: 'upsert_order', order: singleOrder });
+    } else {
+      pushToAwsCloud({ orders });
+    }
   }
 
   // --- City & Route Helpers ---
@@ -752,45 +891,54 @@
       : './public/assets/logo-modern.jpg';
 
     const newOrdersCount = orders.filter(o => o.status === 'new').length;
+    const openForDriversCount = orders.filter(o => o.status === 'new' || o.status === 'broadcasted').length;
 
     const headerEl = document.getElementById('appHeader');
     if (!headerEl) return;
 
     headerEl.innerHTML = `
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-3">
+      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2">
         <!-- Brand Identity -->
-        <div class="flex items-center gap-3 cursor-pointer" onclick="window.primeApp.setView('booking')">
+        <div class="flex items-center gap-2.5 sm:gap-3 cursor-pointer shrink-0" onclick="window.primeApp.setView('booking')">
           <div class="relative">
-            <img src="${logoSrc}" alt="${settings.brandNameHe}" class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-amber-400/80 shadow-lg shadow-amber-500/20" />
-            <span class="absolute -bottom-1 -left-1 bg-emerald-500 w-3.5 h-3.5 rounded-full border-2 border-slate-950" title="מוקד פעיל 24/7"></span>
+            <img src="${logoSrc}" alt="${settings.brandNameHe}" class="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-amber-400/80 shadow-lg shadow-amber-500/20" />
+            <span class="absolute -bottom-1 -left-1 bg-emerald-500 w-3.5 h-3.5 rounded-full border-2 border-slate-950" title="מחובר לענן AWS חי 24/7"></span>
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-lg sm:text-2xl font-black tracking-tight text-white">${settings.brandNameHe}</span>
-              <span class="hidden sm:inline-block text-xs font-extrabold px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30">${settings.brandNameEn}</span>
+              <span class="text-base sm:text-2xl font-black tracking-tight text-white">${settings.brandNameHe}</span>
+              <span class="hidden lg:inline-block text-xs font-extrabold px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30">${settings.brandNameEn}</span>
             </div>
-            <p class="text-xs text-slate-300 hidden md:block">${settings.brandSlogan}</p>
+            <p class="text-[11px] text-slate-300 hidden xl:block">${settings.brandSlogan}</p>
           </div>
         </div>
 
         <!-- Navigation & Auth Pills -->
-        <div class="flex items-center gap-1.5 sm:gap-2.5">
+        <div class="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
           <button onclick="window.primeApp.setView('booking')"
-            class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 ${state.activeView === 'booking' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
+            class="px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'booking' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
             <span>🚕</span>
             <span class="hidden sm:inline">הזמנת מונית</span>
             <span class="sm:hidden">הזמנה</span>
           </button>
 
+          <button onclick="window.primeApp.setView('driver')"
+            class="relative px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'driver' ? 'bg-emerald-400 text-slate-950 border-emerald-400 shadow-md' : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'}">
+            <span>🚖</span>
+            <span class="hidden md:inline">כניסת נהגים (לוח נסיעות)</span>
+            <span class="md:hidden">נהגים</span>
+            ${openForDriversCount > 0 ? `<span class="bg-emerald-500 text-slate-950 text-[11px] font-black px-1.5 py-0.2 rounded-full">${openForDriversCount}</span>` : ''}
+          </button>
+
           <button onclick="window.primeApp.setView('pricelist')"
-            class="px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
+            class="px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
             <span>📋</span>
-            <span class="hidden md:inline">מחירון ארצי</span>
-            <span class="md:hidden">מחירון</span>
+            <span class="hidden lg:inline">מחירון ארצי</span>
+            <span class="lg:hidden">מחירון</span>
           </button>
 
           <button onclick="window.primeApp.setView('admin')"
-            class="relative px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-1.5 border ${state.activeView === 'admin' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-slate-900/90 text-amber-300 border-amber-500/40 hover:bg-slate-800'}">
+            class="relative px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'admin' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-slate-900/90 text-amber-300 border-amber-500/40 hover:bg-slate-800'}">
             <span>⚡</span>
             <span class="hidden sm:inline">ניהול וסדרן</span>
             <span class="sm:hidden">סדרן</span>
@@ -799,15 +947,15 @@
 
           ${currentUser ? `
             <button onclick="window.primeApp.openAuthModal()"
-              class="px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25 transition flex items-center gap-1.5">
-              <span>${currentUser.role === 'super_admin' ? '👑' : '👤'}</span>
-              <span class="max-w-[90px] truncate">${currentUser.name}</span>
+              class="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25 transition flex items-center gap-1.5 cursor-pointer">
+              <span>${currentUser.role === 'super_admin' ? '👑' : (currentUser.role === 'driver' ? '🚖' : '👤')}</span>
+              <span class="max-w-[80px] truncate">${currentUser.name}</span>
             </button>
           ` : `
             <button onclick="window.primeApp.openAuthModal()"
-              class="px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition flex items-center gap-1.5">
+              class="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition flex items-center gap-1.5 cursor-pointer">
               <span>🔐</span>
-              <span>התחברות</span>
+              <span class="hidden sm:inline">התחברות</span>
             </button>
           `}
         </div>
@@ -1655,6 +1803,294 @@
     `;
   }
 
+  // --- Taxi Driver Live Portal (מכרז נסיעות חי, תפיסת נסיעה, תשלום עמלה ב-Bit/PayBox ופתיחת פרטי לקוח) ---
+  function renderDriverView() {
+    const drv = activeDriver || (drivers && drivers[0]) || {
+      id: 'drv-guest',
+      name: 'נהג אורח (הירשם ב-10 שניות)',
+      phone: '',
+      vehicleName: 'מונית סדאן 4 מקומות',
+      plateNumber: '',
+      region: 'נתב״ג וגוש דן',
+      status: 'available_airport',
+      statusLabel: '✈️ זמין לנסיעות'
+    };
+
+    const openOrders = orders.filter(o => o.status === 'new' || o.status === 'broadcasted');
+    const myClaimedOrders = orders.filter(
+      o => (o.status === 'assigned' || o.status === 'paid') &&
+           (o.assignedDriverPhone === drv.phone || o.assignedDriverName === drv.name || state.driverFilter === 'my_rides')
+    );
+    const totalMyNet = myClaimedOrders.reduce((s, o) => s + Number(o.driverNet || 0), 0);
+
+    let filteredOpen = openOrders;
+    if (state.driverFilter === 'airport') {
+      filteredOpen = openOrders.filter(o => o.serviceType === 'to_airport' || o.serviceType === 'from_airport');
+    } else if (state.driverFilter === 'intercity') {
+      filteredOpen = openOrders.filter(o => o.serviceType === 'intercity');
+    } else if (state.driverFilter === 'delivery') {
+      filteredOpen = openOrders.filter(o => o.serviceType === 'delivery');
+    }
+
+    const activeDispatcherName = settings.whatsappPhone === '050-7676946' ? 'אליהו (שותף)' : 'טל פרדקין';
+    const activeDispatcherPhone = settings.bitPhone || settings.whatsappPhone || '054-6373001';
+
+    return `
+      <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <!-- Driver Hero & Status Control -->
+        <div class="bg-gradient-to-l from-slate-950 via-emerald-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-emerald-500/40 shadow-2xl">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+            <div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-extrabold mb-2">
+                <span>🚖 פורטל נהגי מוניות ומיניבוסים — ${settings.brandNameHe}</span>
+                <span>•</span>
+                <span>סנכרון ענן חי (${state.lastCloudSyncAt})</span>
+              </div>
+              <h1 class="text-2xl sm:text-3xl font-black">לוח מכרז נסיעות חי לנתב״ג ובינעירוני</h1>
+              <p class="text-slate-300 text-sm mt-1">
+                תפוס נסיעה בלחיצה אחת, העבר <strong>${settings.defaultCommissionPct}% עמלת תחנה</strong> ב-Bit או PayBox למוקדן הפעיל (<strong>${activeDispatcherName}: <span dir="ltr">${activeDispatcherPhone}</span></strong>), וקבל מיד את מספר הטלפון של הלקוח וניווט Waze לכתובת האיסוף!
+              </p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 shrink-0">
+              <button onclick="window.primeApp.openDriverProfileModal()"
+                class="gold-button px-4 py-3 rounded-2xl text-xs sm:text-sm font-black cursor-pointer flex items-center gap-2">
+                <span>🪪</span>
+                <span>עדכן פרטי נהג / החלף נהג</span>
+              </button>
+              <button onclick="window.primeApp.refreshCloudNow()"
+                class="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-600 text-white text-xs sm:text-sm font-bold cursor-pointer">
+                🔄 רענן נסיעות מהענן
+              </button>
+            </div>
+          </div>
+
+          <!-- Active Driver Identity & Quick Switcher -->
+          <div class="mt-5 pt-5 border-t border-emerald-800/60 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+            <div class="lg:col-span-7 bg-slate-900/80 border border-emerald-500/30 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="text-xs text-emerald-300 font-extrabold">נהג מחובר כעת במכשיר זה:</div>
+                <div class="text-lg font-black text-white mt-0.5">🚖 ${drv.name} <span dir="ltr" class="text-sm text-amber-300 font-mono">(${drv.phone || 'ללא טלפון'})</span></div>
+                <div class="text-xs text-slate-300 mt-0.5">🚘 ${drv.vehicleName} ${drv.plateNumber ? `• מספר רישוי: ${drv.plateNumber}` : ''} • 📍 ${drv.region}</div>
+              </div>
+              <div class="flex flex-col gap-1.5 shrink-0">
+                <select onchange="window.primeApp.updateDriverAvailability(this.value)"
+                  class="rounded-xl bg-emerald-500 text-slate-950 font-black text-xs px-3 py-2.5 outline-none cursor-pointer">
+                  <option value="available_airport" ${drv.status === 'available_airport' ? 'selected' : ''}>✈️ פנוי עכשיו בנתב״ג (טרמינל 3)</option>
+                  <option value="available" ${drv.status === 'available' ? 'selected' : ''}>🟢 פנוי לנסיעות באזור שלי</option>
+                  <option value="busy" ${drv.status === 'busy' ? 'selected' : ''}>🟡 בנסיעה כרגע (זמין להזמנה עתידית)</option>
+                  <option value="offline" ${drv.status === 'offline' ? 'selected' : ''}>🔴 לא פנוי כרגע (בהפסקה)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="lg:col-span-5 grid grid-cols-3 gap-2.5 text-center">
+              <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3">
+                <span class="text-[11px] text-slate-400 block">נסיעות פתוחות לתפיסה</span>
+                <span class="text-2xl font-black text-emerald-400 mt-0.5 block">${openOrders.length}</span>
+              </div>
+              <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3">
+                <span class="text-[11px] text-slate-400 block">נסיעות שתפסתי</span>
+                <span class="text-2xl font-black text-amber-400 mt-0.5 block">${myClaimedOrders.length}</span>
+              </div>
+              <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3">
+                <span class="text-[11px] text-slate-400 block">נטו לכיס שלי</span>
+                <span class="text-2xl font-black text-white mt-0.5 block">₪${totalMyNet.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Demo Driver Switcher Bar -->
+          <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-slate-400 font-bold">החלפה מהירה לבדיקת נהגים במאגר:</span>
+            ${drivers.map(d => `
+              <button onclick="window.primeApp.selectActiveDriver('${d.id}')"
+                class="px-3 py-1 rounded-xl font-bold transition cursor-pointer ${drv.id === d.id ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800/90 text-slate-300 hover:bg-slate-700'}">
+                🚖 ${d.name} (${d.vehicleName.split(' ')[0]})
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- My Claimed Rides (Commission Payment & Customer Unlock) -->
+        ${myClaimedOrders.length > 0 ? `
+          <div class="bg-amber-50/90 border-2 border-amber-400 rounded-3xl p-5 sm:p-6 shadow-md space-y-4">
+            <div class="flex items-center justify-between border-b border-amber-200 pb-3">
+              <div>
+                <span class="text-xs font-extrabold text-amber-800 uppercase">הנסיעות המשובצות אליך</span>
+                <h2 class="text-xl font-black text-slate-900">📲 הנסיעות שתפסת — תשלום עמלה ב-Bit/PayBox ופרטי לקוח</h2>
+              </div>
+              <span class="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black">${myClaimedOrders.length} נסיעות שלך</span>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${myClaimedOrders.map(order => {
+                const isUnlocked = order.status === 'paid';
+                return `
+                  <div class="bg-white rounded-2xl p-5 border-2 ${isUnlocked ? 'border-emerald-500' : 'border-amber-400'} shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                      <span class="bg-slate-900 text-amber-400 font-black text-xs px-3 py-1 rounded-lg">נסיעה #${order.id}</span>
+                      <span class="text-xs font-black px-2.5 py-1 rounded-full ${isUnlocked ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}">
+                        ${isUnlocked ? '✅ עמלה שולמה — פרטי לקוח פתוחים!' : `⏳ ממתין להעברת עמלה (₪${order.commissionAmount})`}
+                      </span>
+                    </div>
+
+                    <div class="text-sm font-black text-slate-900">
+                      📍 איסוף: ${order.originLabel} <br/>
+                      🏁 יעד: ${order.destLabel}
+                    </div>
+                    <div class="text-xs text-slate-600 font-bold">
+                      🕒 שעה: ${order.pickupTimeLabel} | 👥 ${order.passengers} נוסעים | 🧳 ${order.suitcases} מזוודות | 🚘 ${order.vehicleName}
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center text-xs">
+                      <div>
+                        <span class="text-slate-500 block">גבייה מלקוח</span>
+                        <span class="font-black text-slate-900 text-base">₪${order.totalPrice}</span>
+                      </div>
+                      <div>
+                        <span class="text-rose-600 font-bold block">עמלת תחנה (${order.commissionPct}%)</span>
+                        <span class="font-black text-rose-600 text-base">₪${order.commissionAmount}</span>
+                      </div>
+                      <div>
+                        <span class="text-emerald-700 font-bold block">נטו לכיס שלך</span>
+                        <span class="font-black text-emerald-700 text-base">₪${order.driverNet}</span>
+                      </div>
+                    </div>
+
+                    ${isUnlocked ? `
+                      <div class="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 space-y-2.5">
+                        <div class="text-xs font-black text-emerald-950">🔓 פרטי הלקוח המלאים פתוחים עבורך:</div>
+                        <div class="text-sm font-black text-slate-900">
+                          👤 שם הלקוח: ${order.customerName} | 📞 טלפון: <a href="tel:${order.customerPhone}" dir="ltr" class="underline text-emerald-700">${order.customerPhone}</a>
+                        </div>
+                        <div class="text-xs font-bold text-slate-700">💳 אמצעי תשלום של הלקוח: ${order.paymentMethod}</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                          <a href="tel:${order.customerPhone}"
+                            class="py-2.5 px-3 rounded-xl bg-slate-900 text-white font-black text-xs text-center flex items-center justify-center gap-1.5">
+                            📞 חייג ללקוח
+                          </a>
+                          <a href="https://wa.me/${formatCleanIntlPhone(order.customerPhone)}?text=${encodeURIComponent(`שלום ${order.customerName}, אני ${drv.name} נהג המונית שלך מתחנת ${settings.brandNameHe} (${drv.vehicleName}). הנסיעה שלך (#${order.id}) משובצת אליי ואני זמין עבורך!`)}" target="_blank"
+                            class="py-2.5 px-3 rounded-xl whatsapp-cta-btn font-black text-xs text-center flex items-center justify-center gap-1.5">
+                            💬 WhatsApp ללקוח
+                          </a>
+                          <a href="https://waze.com/ul?q=${encodeURIComponent(order.originLabel)}&navigate=yes" target="_blank"
+                            class="py-2.5 px-3 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-black text-xs text-center flex items-center justify-center gap-1.5">
+                            🗺️ נווט ב-Waze
+                          </a>
+                        </div>
+                      </div>
+                    ` : `
+                      <div class="p-4 rounded-2xl bg-amber-50 border border-amber-300 space-y-2.5">
+                        <div class="text-xs font-black text-amber-950">
+                          🔒 לקבלת טלפון הלקוח ופתיחת ניווט Waze, העבר כעת עמלה של <span class="text-rose-600 underline">₪${order.commissionAmount}</span> ב-Bit או PayBox למספר <span dir="ltr" class="font-mono font-black">${activeDispatcherPhone}</span> (${activeDispatcherName}):
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <a href="https://wa.me/${formatCleanIntlPhone(activeDispatcherPhone)}?text=${encodeURIComponent(`אהלן ${activeDispatcherName}, כאן הנהג ${drv.name} (${drv.phone}). תפסתי את נסיעה #${order.id} (${order.originLabel} -> ${order.destLabel}) והעברתי עכשיו עמלה של ₪${order.commissionAmount} בביט/פייבוקס!`)}" target="_blank"
+                            class="py-2.5 px-3 rounded-xl whatsapp-cta-btn font-black text-xs text-center flex items-center justify-center gap-1.5">
+                            💸 שלח אישור העברת ביט ב-WhatsApp
+                          </a>
+                          <button onclick="window.primeApp.driverConfirmCommissionPaid('${order.id}')"
+                            class="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-400 font-black text-xs cursor-pointer">
+                            ✅ העברתי עמלה — פתח לי פרטי לקוח!
+                          </button>
+                        </div>
+                      </div>
+                    `}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- Open Rides Filter Tabs -->
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap gap-2">
+            ${[
+              { id: 'all', label: `🔥 כל הנסיעות הפנויות (${openOrders.length})` },
+              { id: 'airport', label: '✈️ נתב״ג (המראות ונחיתות)' },
+              { id: 'intercity', label: '🛣️ בינעירוני ספיישל' },
+              { id: 'delivery', label: '📦 משלוחים אקספרס' }
+            ].map(f => `
+              <button onclick="window.primeApp.setDriverFilter('${f.id}')"
+                class="px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition cursor-pointer ${state.driverFilter === f.id ? 'bg-slate-900 text-amber-400 shadow-md' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}">
+                ${f.label}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- Open Rides Cards Grid -->
+        ${filteredOpen.length === 0 ? `
+          <div class="bg-white rounded-3xl p-10 text-center border border-slate-200 shadow-sm">
+            <div class="text-4xl mb-2">🚕</div>
+            <h3 class="text-lg font-black text-slate-900">אין כרגע נסיעות פנויות בסינון זה</h3>
+            <p class="text-xs text-slate-500 mt-1">כל נסיעה חדשה שמזמין לקוח באתר מופיעה כאן אוטומטית תוך שניות!</p>
+          </div>
+        ` : `
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            ${filteredOpen.map(order => {
+              const safeOriginCityOnly = String(order.originLabel || '').split('(')[0].trim();
+              const safeDestCityOnly = String(order.destLabel || '').split('(')[0].trim();
+              return `
+                <div class="bg-white rounded-3xl p-6 border-2 border-slate-200 hover:border-emerald-500 transition shadow-sm flex flex-col justify-between gap-4">
+                  <div class="space-y-3">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2">
+                        <span class="bg-slate-900 text-amber-400 font-black text-xs px-3 py-1 rounded-xl">#${order.id}</span>
+                        <span class="bg-emerald-100 text-emerald-900 font-extrabold text-xs px-3 py-1 rounded-full">פנוי לתפיסה מיידית 🔥</span>
+                      </div>
+                      <span class="text-xs font-bold text-slate-500">🕒 ${order.pickupTimeLabel}</span>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 space-y-1.5">
+                      <div class="text-base font-black text-slate-900">📍 איסוף מאזור: ${safeOriginCityOnly}</div>
+                      <div class="text-base font-black text-indigo-950">🏁 יעד: ${safeDestCityOnly}</div>
+                      <div class="text-[11px] font-bold text-amber-800 bg-amber-100/70 px-2.5 py-1 rounded-lg inline-block">
+                        🔒 כתובת מדויקת וטלפון הלקוח ייפתחו מיד לאחר תפיסת הנסיעה
+                      </div>
+                    </div>
+
+                    <div class="flex flex-wrap gap-2 text-xs font-bold text-slate-700">
+                      <span class="px-2.5 py-1 rounded-lg bg-slate-100">🚘 ${order.vehicleName}</span>
+                      <span class="px-2.5 py-1 rounded-lg bg-slate-100">👥 ${order.passengers} נוסעים</span>
+                      <span class="px-2.5 py-1 rounded-lg bg-slate-100">🧳 ${order.suitcases} מזוודות</span>
+                      <span class="px-2.5 py-1 rounded-lg bg-slate-100">✨ ${order.extrasSummary}</span>
+                    </div>
+                  </div>
+
+                  <div class="space-y-3 pt-3 border-t border-slate-100">
+                    <div class="grid grid-cols-3 gap-2 bg-emerald-50/70 p-3 rounded-2xl border border-emerald-200 text-center">
+                      <div>
+                        <span class="text-[11px] text-slate-500 font-bold block">מחיר מלקוח</span>
+                        <span class="text-lg font-black text-slate-900">₪${order.totalPrice}</span>
+                      </div>
+                      <div>
+                        <span class="text-[11px] text-rose-600 font-bold block">עמלת תחנה (${order.commissionPct}%)</span>
+                        <span class="text-lg font-black text-rose-600">₪${order.commissionAmount}</span>
+                      </div>
+                      <div>
+                        <span class="text-[11px] text-emerald-800 font-extrabold block">💰 נטו לנהג</span>
+                        <span class="text-xl font-black text-emerald-700">₪${order.driverNet}</span>
+                      </div>
+                    </div>
+
+                    <button onclick="window.primeApp.driverClaimOrder('${order.id}')"
+                      class="w-full whatsapp-cta-btn py-3.5 px-5 rounded-2xl text-sm font-black cursor-pointer flex items-center justify-center gap-2 shadow-md">
+                      <span>✋</span>
+                      <span>תפוס נסיעה זו עכשיו (רווח נטו: ₪${order.driverNet})</span>
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `}
+      </section>
+    `;
+  }
+
   // --- Tal & Eliyahu Dispatcher, WhatsApp Driver Broadcast & Bit/PayBox Commission Studio ---
   function renderAdminView() {
     if (!isSuperAdminUser(currentUser)) {
@@ -1664,21 +2100,21 @@
             <img src="./public/assets/logo-modern.jpg" class="w-20 h-20 rounded-2xl mx-auto mb-4 border-2 border-amber-400" />
             <span class="text-xs font-extrabold text-amber-400 uppercase tracking-wider">אזור מוגן — הנהלת התחנה</span>
             <h2 class="text-2xl font-black mt-1 mb-2">כניסת מנהלים ושותפים (טל ואליהו)</h2>
-            <p class="text-sm text-slate-300 mb-6">גישה למערכת הסדרן, הפצת נסיעות לקבוצות נהגים, מעקב עמלות ב-Bit/PayBox ועריכת מחירונים שמורה לבעלי התחנה בלבד.</p>
-            <button onclick="window.primeApp.openAuthModal(true)"
-              class="w-full gold-button py-3.5 px-6 rounded-2xl text-base font-black cursor-pointer mb-3">
-              🔐 התחבר למערכת הניהול (טלפון + קוד / שם משתמש)
-            </button>
-            <div class="grid grid-cols-2 gap-2.5 pt-3 border-t border-slate-800">
+            <p class="text-sm text-slate-300 mb-6">גישה למערכת הסדרן, הפצת נסיעות לקבוצות נהגים, מעקב עמלות ב-Bit/PayBox, מאגר נהגים ודוחות רווחיות שמורה לבעלי התחנה בלבד.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <button onclick="window.primeApp.quickPartnerLogin('tal')"
-                class="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/30 text-amber-300 text-xs font-extrabold cursor-pointer">
-                ⚡ כניסה מהירה: טל (054-6373001)
+                class="py-3.5 px-4 rounded-2xl gold-button text-slate-950 text-sm font-black cursor-pointer flex items-center justify-center gap-2 shadow-lg">
+                <span>👑 כניסה מהירה: טל פרדקין</span>
               </button>
               <button onclick="window.primeApp.quickPartnerLogin('eliyahu')"
-                class="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-400/30 text-amber-300 text-xs font-extrabold cursor-pointer">
-                ⚡ כניסה מהירה: אליהו (050-7676946)
+                class="py-3.5 px-4 rounded-2xl whatsapp-cta-btn text-white text-sm font-black cursor-pointer flex items-center justify-center gap-2 shadow-lg">
+                <span>👑 כניסה מהירה: אליהו (שותף)</span>
               </button>
             </div>
+            <button onclick="window.primeApp.openAuthModal('')"
+              class="w-full py-3 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold cursor-pointer">
+              🔐 או התחבר עם קוד אימות לטלפון / שם משתמש
+            </button>
           </div>
         </section>
       `;
@@ -1688,6 +2124,7 @@
     const totalRevenue = orders.reduce((s, o) => s + Number(o.totalPrice || 0), 0);
     const totalCommissions = orders.reduce((s, o) => s + Number(o.commissionAmount || 0), 0);
     const paidCommissions = orders.filter(o => o.status === 'paid').reduce((s, o) => s + Number(o.commissionAmount || 0), 0);
+    const availableDriversCount = drivers.filter(d => d.status === 'available' || d.status === 'available_airport').length;
 
     return `
       <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1697,11 +2134,13 @@
             <div>
               <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 text-amber-300 text-xs font-extrabold mb-2">
                 <span>👑</span>
-                <span>מחובר כרגע: ${currentUser.name} (${currentUser.badge})</span>
+                <span>מחובר כרגע: ${currentUser.name} (${currentUser.badge || 'מנהל ראשי ושותף'})</span>
+                <span>•</span>
+                <span class="text-emerald-300">☁️ ענן AWS מסונכרן (${state.lastCloudSyncAt})</span>
               </div>
-              <h1 class="text-2xl sm:text-3xl font-black">מרכז שליטה, הפצת נסיעות לנהגים וגביית עמלות — טל ואליהו</h1>
+              <h1 class="text-2xl sm:text-3xl font-black">מרכז שליטה, סדרן נהגים, עמלות וניתוחים — טל ואליהו</h1>
               <p class="text-slate-300 text-sm mt-1">
-                כל נסיעה שנכנסת מהאתר מופיעה כאן ובוואטסאפ של המוקדן הפעיל. בלחיצה אחת תוכל להוציא מכרז לקבוצת הנהגים (ללא חשיפת טלפון הלקוח!), לשלוח פרטים לנהג שזכה ולגבות <strong>${settings.defaultCommissionPct}% עמלה</strong> ב-Bit או PayBox למספר <strong>${settings.bitPhone}</strong>.
+                כל נסיעה מהאתר וכל תפיסת נסיעה של נהג מתעדכנות כאן בזמן אמת. תוכל להוציא מכרז לקבוצת הנהגים ב-WhatsApp, לשבץ נהג זמין מהמאגר ולגבות <strong>${settings.defaultCommissionPct}% עמלה</strong> ב-Bit או PayBox למספר <strong>${settings.bitPhone}</strong>.
               </p>
             </div>
             <div class="flex flex-wrap gap-2">
@@ -1709,6 +2148,10 @@
                 class="gold-button px-4 py-3 rounded-2xl text-sm font-black flex items-center gap-2 cursor-pointer">
                 <span>➕</span>
                 <span>הזן נסיעה חדשה ידנית</span>
+              </button>
+              <button onclick="window.primeApp.refreshCloudNow()"
+                class="px-4 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold cursor-pointer">
+                🔄 סנכרן עכשיו
               </button>
             </div>
           </div>
@@ -1732,22 +2175,26 @@
           </div>
 
           <!-- KPI Cards -->
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5 mt-5">
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5">
             <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-              <span class="text-xs text-slate-400 block">סה״כ הזמנות במערכת</span>
+              <span class="text-xs text-slate-400 block">סה״כ הזמנות</span>
               <span class="text-2xl sm:text-3xl font-black text-white mt-1 block">${totalOrders}</span>
             </div>
             <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-              <span class="text-xs text-slate-400 block">היקף נסיעות (גבייה מלקוחות)</span>
+              <span class="text-xs text-slate-400 block">היקף נסיעות ברוטו</span>
               <span class="text-2xl sm:text-3xl font-black text-amber-400 mt-1 block">₪${totalRevenue.toLocaleString()}</span>
             </div>
             <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4">
-              <span class="text-xs text-amber-300 font-bold block">סה״כ עמלות תחנה (${settings.defaultCommissionPct}%)</span>
+              <span class="text-xs text-amber-300 font-bold block">עמלות תחנה (${settings.defaultCommissionPct}%)</span>
               <span class="text-2xl sm:text-3xl font-black text-emerald-400 mt-1 block">₪${totalCommissions.toLocaleString()}</span>
             </div>
             <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4">
-              <span class="text-xs text-slate-400 block">עמלות שנגבו ב-Bit/PayBox</span>
+              <span class="text-xs text-slate-400 block">נגבו ב-Bit/PayBox</span>
               <span class="text-2xl sm:text-3xl font-black text-sky-400 mt-1 block">₪${paidCommissions.toLocaleString()}</span>
+            </div>
+            <div class="bg-slate-900/90 border border-emerald-500/30 rounded-2xl p-4 col-span-2 sm:col-span-1">
+              <span class="text-xs text-emerald-300 font-bold block">נהגים זמינים כעת</span>
+              <span class="text-2xl sm:text-3xl font-black text-emerald-400 mt-1 block">${availableDriversCount}/${drivers.length}</span>
             </div>
           </div>
         </div>
@@ -1755,13 +2202,15 @@
         <!-- Admin Sub-navigation -->
         <div class="flex flex-wrap gap-2 mb-6">
           ${[
-            { id: 'orders', label: '📲 יומן נסיעות ושיבוץ נהגים ב-WhatsApp', count: orders.length },
-            { id: 'auth_servers', label: '🔐 שותפים, התחברות ושרתי SMS / WhatsApp חינם' },
-            { id: 'branding', label: '🎨 מיתוג, לוגו גיאומטרי ומספרי תחנה' },
-            { id: 'pricing', label: '💰 עריכת מחירון ערים ואחוזי עמלה' }
+            { id: 'orders', label: '📲 יומן נסיעות ושיבוץ נהגים', count: orders.length },
+            { id: 'drivers', label: '🚖 מאגר נהגים וזמינות חיה', count: drivers.length },
+            { id: 'analytics', label: '📊 ניתוחים ודוחות רווחיות (BI)' },
+            { id: 'pricing', label: '💰 עריכת מחירון ואחוזי עמלה' },
+            { id: 'branding', label: '🎨 מיתוג ולוגו' },
+            { id: 'auth_servers', label: '🔐 שותפים, ענן AWS ושרתי SMS' }
           ].map(tab => `
             <button onclick="window.primeApp.setAdminTab('${tab.id}')"
-              class="px-4 py-2.5 rounded-2xl text-sm font-extrabold transition flex items-center gap-2 ${state.adminTab === tab.id ? 'bg-slate-900 text-amber-400 shadow-md' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}">
+              class="px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 cursor-pointer ${state.adminTab === tab.id ? 'bg-slate-900 text-amber-400 shadow-md' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}">
               <span>${tab.label}</span>
               ${tab.count !== undefined ? `<span class="bg-amber-400 text-slate-950 text-xs font-black px-2 py-0.5 rounded-full">${tab.count}</span>` : ''}
             </button>
@@ -1769,6 +2218,8 @@
         </div>
 
         ${state.adminTab === 'orders' ? renderAdminOrdersTab() : ''}
+        ${state.adminTab === 'drivers' ? renderAdminDriversTab() : ''}
+        ${state.adminTab === 'analytics' ? renderAdminAnalyticsTab() : ''}
         ${state.adminTab === 'auth_servers' ? renderAdminAuthServersTab() : ''}
         ${state.adminTab === 'branding' ? renderAdminBrandingTab() : ''}
         ${state.adminTab === 'pricing' ? renderAdminPricingTab() : ''}
@@ -2032,8 +2483,164 @@
     `;
   }
 
+  function renderAdminDriversTab() {
+    const statusMap = {
+      available_airport: { label: '✈️ פנוי בנתב״ג עכשיו', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+      available: { label: '🟢 פנוי לנסיעות', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200' },
+      busy: { label: '🟡 בנסיעה כרגע', cls: 'bg-amber-100 text-amber-900 border-amber-300' },
+      offline: { label: '🔴 לא פנוי / הפסקה', cls: 'bg-slate-100 text-slate-600 border-slate-300' }
+    };
+
+    return `
+      <div class="space-y-6">
+        <div class="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 class="text-xl font-black text-slate-900">🚖 מאגר נהגי התחנה וזמינות בזמן אמת (${drivers.length} נהגים)</h3>
+            <p class="text-xs text-slate-500 mt-1">כל נהג שנרשם בפורטל הנהגים או מעדכן סטטוס ("פנוי בנתב״ג") מופיע כאן מיד עם כפתור שיבוץ ו-WhatsApp ישיר</p>
+          </div>
+          <button onclick="window.primeApp.openDriverProfileModal(true)"
+            class="gold-button px-4 py-3 rounded-2xl text-xs font-black cursor-pointer shrink-0">
+            ➕ הוסף נהג חדש למאגר התחנה
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${drivers.map(d => {
+            const st = statusMap[d.status] || statusMap.available;
+            return `
+              <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between gap-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <span class="text-lg font-black text-slate-900">🚖 ${d.name}</span>
+                      <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-full border ${st.cls}">${st.label}</span>
+                    </div>
+                    <div class="text-xs font-bold text-slate-600 mt-1">
+                      📞 טלפון: <a href="tel:${d.phone}" dir="ltr" class="font-black text-slate-900 underline">${d.phone}</a> | 📍 אזור: ${d.region}
+                    </div>
+                    <div class="text-xs font-bold text-indigo-900 mt-1">
+                      🚘 ${d.vehicleName} ${d.plateNumber ? `• רישוי: <span class="font-mono">${d.plateNumber}</span>` : ''}
+                    </div>
+                  </div>
+                  <div class="text-left shrink-0">
+                    <span class="text-[11px] text-slate-400 block">עמלות ששילם</span>
+                    <span class="text-lg font-black text-emerald-700">₪${Number(d.totalCommissionsPaid || 0).toLocaleString()}</span>
+                    <span class="text-[10px] text-slate-500 block">${d.completedRides || 0} נסיעות</span>
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap gap-2 pt-3 border-t border-slate-100">
+                  <a href="https://wa.me/${formatCleanIntlPhone(d.phone)}?text=${encodeURIComponent(`אהלן ${d.name}, כאן מוקד ${settings.brandNameHe}. יש לנו נסיעה חדשה שמתאימה לך — פנוי לקחת?`)}" target="_blank"
+                    class="flex-1 py-2.5 px-3 rounded-xl whatsapp-cta-btn text-xs font-black text-center">
+                    💬 שלח הודעה לנהג ב-WhatsApp
+                  </a>
+                  <button onclick="window.primeApp.selectActiveDriver('${d.id}'); window.primeApp.setView('driver');"
+                    class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold cursor-pointer">
+                    👁️ צפה בפורטל כנהג זה
+                  </button>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderAdminAnalyticsTab() {
+    const totalOrders = orders.length || 1;
+    const totalRevenue = orders.reduce((s, o) => s + Number(o.totalPrice || 0), 0);
+    const totalComm = orders.reduce((s, o) => s + Number(o.commissionAmount || 0), 0);
+    const paidComm = orders.filter(o => o.status === 'paid').reduce((s, o) => s + Number(o.commissionAmount || 0), 0);
+    const pendingComm = totalComm - paidComm;
+    const avgOrderPrice = Math.round(totalRevenue / totalOrders);
+    const avgComm = Math.round(totalComm / totalOrders);
+    const partnerShareEach = Math.round(totalComm / 2);
+
+    const byType = [
+      { id: 'to_airport', label: '✈️ מונית לנתב״ג (המראות)', icon: '🛫' },
+      { id: 'from_airport', label: '🛬 איסוף מנתב״ג (נחיתות)', icon: '🛬' },
+      { id: 'intercity', label: '🛣️ נסיעות בינעירוניות ספיישל', icon: '🚕' },
+      { id: 'delivery', label: '📦 משלוחים וחבילות אקספרס', icon: '📦' }
+    ].map(t => {
+      const list = orders.filter(o => o.serviceType === t.id);
+      const rev = list.reduce((s, o) => s + Number(o.totalPrice || 0), 0);
+      const comm = list.reduce((s, o) => s + Number(o.commissionAmount || 0), 0);
+      return { ...t, count: list.length, rev, comm, pct: Math.round((list.length / totalOrders) * 100) };
+    });
+
+    return `
+      <div class="space-y-6">
+        <!-- Executive Financial Summary -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm">
+            <span class="text-xs font-bold text-slate-500 block">ממוצע מחיר נסיעה ללקוח</span>
+            <span class="text-3xl font-black text-slate-900 mt-1 block">₪${avgOrderPrice}</span>
+            <span class="text-[11px] text-emerald-700 font-bold mt-1 block">עמלה ממוצעת לנסיעה: ₪${avgComm}</span>
+          </div>
+          <div class="bg-white rounded-3xl p-5 border border-emerald-300 shadow-sm">
+            <span class="text-xs font-bold text-emerald-800 block">סה״כ עמלות שנגבו ב-Bit/PayBox</span>
+            <span class="text-3xl font-black text-emerald-600 mt-1 block">₪${paidComm.toLocaleString()}</span>
+            <span class="text-[11px] text-slate-500 font-bold mt-1 block">ממתין לגבייה מנהגים: ₪${pendingComm.toLocaleString()}</span>
+          </div>
+          <div class="bg-amber-50 rounded-3xl p-5 border border-amber-300 shadow-sm">
+            <span class="text-xs font-extrabold text-amber-900 block">👑 חלק טל פרדקין (50% מעמלות)</span>
+            <span class="text-3xl font-black text-amber-950 mt-1 block">₪${partnerShareEach.toLocaleString()}</span>
+            <span class="text-[11px] text-amber-800 font-bold mt-1 block">טלפון מוקד וביט: 054-6373001</span>
+          </div>
+          <div class="bg-emerald-50 rounded-3xl p-5 border border-emerald-300 shadow-sm">
+            <span class="text-xs font-extrabold text-emerald-900 block">👑 חלק אליהו — שותף (50% מעמלות)</span>
+            <span class="text-3xl font-black text-emerald-950 mt-1 block">₪${partnerShareEach.toLocaleString()}</span>
+            <span class="text-[11px] text-emerald-800 font-bold mt-1 block">טלפון מוקד וביט: 050-7676946</span>
+          </div>
+        </div>
+
+        <!-- Breakdown by Service Type & Driver Leaderboard -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <h3 class="text-lg font-black text-slate-900 border-b border-slate-100 pb-3">📊 פילוח הכנסות ועמלות לפי סוג שירות</h3>
+            <div class="space-y-4">
+              ${byType.map(row => `
+                <div class="space-y-1.5">
+                  <div class="flex items-center justify-between text-xs font-bold">
+                    <span class="text-slate-900 font-black">${row.label} (${row.count} הזמנות)</span>
+                    <span class="text-emerald-700 font-black">היקף: ₪${row.rev.toLocaleString()} | עמלת תחנה: ₪${row.comm.toLocaleString()}</span>
+                  </div>
+                  <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-l from-amber-400 to-emerald-500 rounded-full" style="width: ${Math.max(8, row.pct)}%"></div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <div class="lg:col-span-5 bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
+            <h3 class="text-lg font-black text-slate-900 border-b border-slate-100 pb-3">🏆 דירוג נהגים משלמי עמלות (Top Drivers)</h3>
+            <div class="space-y-3">
+              ${drivers.slice().sort((a, b) => (b.totalCommissionsPaid || 0) - (a.totalCommissionsPaid || 0)).map((d, idx) => `
+                <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-7 h-7 rounded-xl bg-slate-900 text-amber-400 font-black flex items-center justify-center">${idx + 1}</span>
+                    <div>
+                      <div class="font-black text-slate-900">${d.name}</div>
+                      <div class="text-[11px] text-slate-500">${d.vehicleName} • ${d.completedRides || 0} נסיעות</div>
+                    </div>
+                  </div>
+                  <div class="text-left">
+                    <span class="font-black text-emerald-700 text-sm">₪${Number(d.totalCommissionsPaid || 0).toLocaleString()}</span>
+                    <span class="text-[10px] text-slate-400 block">עמלות בביט/פייבוקס</span>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function renderAdminAuthServersTab() {
-    const owners = settings.owners || DATA.defaultSettings.owners || [];
+    const owners = DATA.owners || settings.owners || DATA.defaultSettings.owners || [];
     return `
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div class="lg:col-span-6 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
@@ -2328,6 +2935,8 @@
 
     if (state.activeView === 'booking') {
       mainEl.innerHTML = renderBookingView();
+    } else if (state.activeView === 'driver') {
+      mainEl.innerHTML = renderDriverView();
     } else if (state.activeView === 'pricelist') {
       mainEl.innerHTML = renderPricelistView();
     } else if (state.activeView === 'admin') {
@@ -2338,6 +2947,10 @@
   // --- Public Controller API ---
   window.primeApp = {
     openAuthModal(defaultPhone = '') {
+      if (typeof defaultPhone === 'boolean') {
+        state.pendingAdminRedirect = defaultPhone;
+        defaultPhone = '';
+      }
       renderAuthModal('phone', 'request', defaultPhone, '');
     },
 
@@ -2351,18 +2964,20 @@
       const rawPhone = (phoneEl?.value || '').trim();
       const rawName = (nameEl?.value || '').trim();
       if (!rawPhone || rawPhone.replace(/\D/g, '').length < 9) {
-        showToast('אנא הזן מספר טלפון נייד תקין (למשל 050-7676946)', 'error');
+        showToast('אנא הזן מספר טלפון נייד תקין (למשל 050-7676946)', 'warning');
         return;
       }
       state._pendingAuthName = rawName;
       const randomOtp = String(Math.floor(1000 + Math.random() * 9000));
       state._pendingOtpCode = randomOtp;
 
+      const otpEndpoint = getCloudApiUrl() || '/api/auth/send-otp';
       try {
-        const res = await fetch('/api/auth/send-otp', {
+        const res = await fetch(otpEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            action: 'send-otp',
             phone: rawPhone,
             greenApiInstanceId: settings.greenApiInstanceId || '',
             greenApiToken: settings.greenApiToken || '',
@@ -2377,9 +2992,7 @@
           renderAuthModal('phone', 'verify', rawPhone, codeToShow);
           return;
         }
-      } catch (_) {
-        // Fallback to instant local OTP if running as static file without Node server
-      }
+      } catch (_) {}
 
       showToast(`קוד האימות המהיר שלך: ${randomOtp} 📲`);
       renderAuthModal('phone', 'verify', rawPhone, randomOtp);
@@ -2389,7 +3002,7 @@
       const otpEl = document.getElementById('authOtpInput');
       const enteredCode = (otpEl?.value || '').trim();
       if (!enteredCode) {
-        showToast('אנא הזן את קוד האימות', 'error');
+        showToast('אנא הזן את קוד האימות', 'warning');
         return;
       }
 
@@ -2397,10 +3010,10 @@
       const isValidLocal =
         enteredCode === state._pendingOtpCode ||
         enteredCode === '1234' ||
-        (matchedOwner && enteredCode === matchedOwner.masterPin);
+        (matchedOwner && (enteredCode === matchedOwner.masterPin || enteredCode === matchedOwner.quickPin));
 
       if (!isValidLocal) {
-        showToast('קוד האימות שגוי — נסה שוב או הזן 1234 לבעלים', 'error');
+        showToast('קוד האימות שגוי — נסה שוב או הזן 1234 לבעלים', 'warning');
         return;
       }
 
@@ -2408,6 +3021,7 @@
         ? {
             id: matchedOwner.id,
             name: matchedOwner.name,
+            badge: matchedOwner.badge,
             phone: matchedOwner.phone,
             role: 'super_admin'
           }
@@ -2421,8 +3035,11 @@
       if (!state.customerName && loggedUser.name) state.customerName = loggedUser.name;
       if (!state.customerPhone && loggedUser.phone) state.customerPhone = loggedUser.phone;
 
-      saveAuthUser(loggedUser);
       window.primeApp.closeModal();
+      if (loggedUser.role === 'super_admin') {
+        state.activeView = 'admin';
+      }
+      saveAuthUser(loggedUser);
       showToast(`ברוך הבא, ${loggedUser.name}! התחברת בהצלחה 🎉`);
     },
 
@@ -2433,27 +3050,30 @@
       const rawPass = (passEl?.value || '').trim();
 
       if (!rawUser) {
-        showToast('אנא הזן שם משתמש או מספר טלפון', 'error');
+        showToast('אנא הזן שם משתמש או מספר טלפון', 'warning');
         return;
       }
 
       const matchedOwner = findOwnerByInput(rawUser);
       if (matchedOwner) {
-        if (rawPass && rawPass !== matchedOwner.masterPin && rawPass !== '1234') {
-          showToast('סיסמה / קוד שגוי עבור מנהל מערכת', 'error');
+        if (rawPass && rawPass !== matchedOwner.masterPin && rawPass !== matchedOwner.quickPin && rawPass !== '1234') {
+          showToast('סיסמה / קוד שגוי עבור מנהל מערכת', 'warning');
           return;
         }
+        window.primeApp.closeModal();
+        state.activeView = 'admin';
         saveAuthUser({
           id: matchedOwner.id,
           name: matchedOwner.name,
+          badge: matchedOwner.badge,
           phone: matchedOwner.phone,
           role: 'super_admin'
         });
-        window.primeApp.closeModal();
         showToast(`ברוך הבא, ${matchedOwner.name}! גישת ניהול מלאה הופעלה 👑`);
         return;
       }
 
+      window.primeApp.closeModal();
       saveAuthUser({
         id: 'user_' + Date.now(),
         name: rawUser,
@@ -2461,29 +3081,32 @@
         role: 'customer'
       });
       if (!state.customerName) state.customerName = rawUser;
-      window.primeApp.closeModal();
       showToast(`שלום ${rawUser}, התחברת בהצלחה! 👋`);
     },
 
     quickPartnerLogin(ownerId) {
-      const owners = settings.owners || DATA.defaultSettings.owners || [];
+      const owners = DATA.owners || settings.owners || [];
       const found = owners.find(o => o.id === ownerId) || owners[0];
       if (!found) return;
+      window.primeApp.closeModal();
+      state.activeView = 'admin';
       saveAuthUser({
         id: found.id,
         name: found.name,
+        badge: found.badge || 'מנהל ראשי ושותף',
         phone: found.phone,
         role: 'super_admin'
       });
-      window.primeApp.closeModal();
       showToast(`מחובר כעת בתור ${found.name} (${found.phone}) — גישה מלאה להכל! 👑`);
     },
 
     switchActivePartner(ownerId) {
-      const owners = settings.owners || DATA.defaultSettings.owners || [];
+      const owners = DATA.owners || settings.owners || [];
       const found = owners.find(o => o.id === ownerId);
       if (!found) return;
       saveSettings({
+        activePartnerId: found.id,
+        whatsappPhone: found.phone,
         dispatcherPhone: found.phone,
         bitPhone: found.bitPhone || found.phone,
         payboxPhone: found.payboxPhone || found.phone
@@ -2493,7 +3116,179 @@
 
     logout() {
       saveAuthUser(null);
-      showToast('התנתקת מהמערכת בהצלחה 👋', 'info');
+      showToast('התנתקת מהמערכת בהצלחה 👋');
+    },
+
+    // --- Driver Portal Actions ---
+    setDriverFilter(filterId) {
+      state.driverFilter = filterId;
+      renderAll();
+    },
+
+    selectActiveDriver(driverId) {
+      const found = drivers.find(d => d.id === driverId);
+      if (!found) return;
+      saveActiveDriver(found);
+      showToast(`נהג פעיל הוחלף ל-${found.name} (${found.vehicleName}) 🚖`);
+      renderAll();
+    },
+
+    updateDriverAvailability(statusVal) {
+      if (!activeDriver) return;
+      const labels = {
+        available_airport: '✈️ פנוי עכשיו בנתב״ג (טרמינל 3)',
+        available: '🟢 פנוי לנסיעות באזור שלי',
+        busy: '🟡 בנסיעה כרגע',
+        offline: '🔴 לא פנוי כרגע'
+      };
+      activeDriver.status = statusVal;
+      activeDriver.statusLabel = labels[statusVal] || labels.available;
+      saveActiveDriver(activeDriver);
+
+      const idx = drivers.findIndex(d => d.id === activeDriver.id || d.phone === activeDriver.phone);
+      if (idx >= 0) {
+        drivers[idx] = { ...drivers[idx], ...activeDriver };
+      } else {
+        drivers.unshift(activeDriver);
+      }
+      saveDrivers(activeDriver);
+      showToast(`סטטוס הזמינות שלך עודכן בענן: ${activeDriver.statusLabel}`);
+      renderAll();
+    },
+
+    driverClaimOrder(orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+      const drv = activeDriver || drivers[0];
+      if (!drv || !drv.phone) {
+        window.primeApp.openDriverProfileModal();
+        showToast('אנא הזן שם ומספר טלפון של נהג כדי לתפוס נסיעה', 'warning');
+        return;
+      }
+      order.status = 'assigned';
+      order.assignedDriverName = drv.name;
+      order.assignedDriverPhone = drv.phone;
+      order.assignedDriverVehicle = drv.vehicleName;
+      saveOrders(order);
+      showToast(`נסיעה #${order.id} נתפסה על ידך! העבר עמלה של ₪${order.commissionAmount} בביט/פייבוקס לפתיחת פרטי הלקוח 🚖`);
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+      renderAll();
+    },
+
+    driverConfirmCommissionPaid(orderId) {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+      order.status = 'paid';
+      saveOrders(order);
+
+      const drv = activeDriver || drivers[0];
+      if (drv) {
+        const idx = drivers.findIndex(d => d.id === drv.id || d.phone === drv.phone);
+        if (idx >= 0) {
+          drivers[idx].completedRides = (drivers[idx].completedRides || 0) + 1;
+          drivers[idx].totalCommissionsPaid = (drivers[idx].totalCommissionsPaid || 0) + Number(order.commissionAmount || 0);
+          saveDrivers(drivers[idx]);
+        }
+      }
+
+      showToast(`תודה! העמלה (₪${order.commissionAmount}) נרשמה — פרטי הלקוח וניווט Waze פתוחים כעת עבורך! 🔓`);
+      renderAll();
+    },
+
+    openDriverProfileModal(isNewDriver = false) {
+      const modalRoot = document.getElementById('modalRoot');
+      if (!modalRoot) return;
+      const d = isNewDriver ? { name: '', phone: '', vehicleName: 'מונית סדאן 4 מקומות', plateNumber: '', region: 'נתב״ג וגוש דן' } : (activeDriver || drivers[0] || {});
+      modalRoot.innerHTML = `
+        <div class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+          <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-2 border-emerald-500">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
+              <h3 class="text-lg font-black text-slate-900">🚖 ${isNewDriver ? 'הוספת נהג חדש למאגר התחנה' : 'פרטי נהג מונית / מיניבוס'}</h3>
+              <button onclick="window.primeApp.closeModal()" class="text-slate-400 hover:text-slate-700 font-black cursor-pointer">✕</button>
+            </div>
+            <div class="space-y-3 text-sm">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">שם מלא של הנהג</label>
+                <input id="drvNameInput" type="text" value="${d.name || ''}" placeholder="לדוגמה: משה כהן" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-bold" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">טלפון נייד (ל-WhatsApp וביט)</label>
+                <input id="drvPhoneInput" type="tel" dir="ltr" value="${d.phone || ''}" placeholder="052-XXXXXXX" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-bold text-right" />
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">סוג רכב וקיבולת</label>
+                <select id="drvVehicleInput" class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 font-bold">
+                  <option value="מונית סדאן 4 מקומות" ${d.vehicleName?.includes('סדאן') ? 'selected' : ''}>🚕 מונית סדאן רגילה (עד 4 נוסעים)</option>
+                  <option value="סדאן פרימיום / סטיישן תא מטען גדול" ${d.vehicleName?.includes('סטיישן') ? 'selected' : ''}>✨ סדאן פרימיום / סטיישן (תא מטען גדול)</option>
+                  <option value="מונית גדולה 6 מקומות" ${d.vehicleName?.includes('6') ? 'selected' : ''}>🚐 מונית גדולה / מיניוואן (5–6 מקומות)</option>
+                  <option value="מרצדס V-Class VIP (7-8 מקומות)" ${d.vehicleName?.includes('V-Class') ? 'selected' : ''}>👑 מרצדס V-Class VIP (7–8 מקומות)</option>
+                  <option value="מיניבוס מרצדס (10-14 מקומות)" ${d.vehicleName?.includes('מיניבוס') ? 'selected' : ''}>🚌 מיניבוס לקבוצות (10–14 מקומות)</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">מספר רישוי / כובע</label>
+                  <input id="drvPlateInput" type="text" dir="ltr" value="${d.plateNumber || ''}" placeholder="84-291-26" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono font-bold text-center" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1">אזור עבודה עיקרי</label>
+                  <input id="drvRegionInput" type="text" value="${d.region || 'נתב״ג וגוש דן'}" placeholder="נתב״ג וגוש דן" class="w-full rounded-xl border border-slate-300 px-3 py-2 font-bold" />
+                </div>
+              </div>
+              <button onclick="window.primeApp.saveDriverProfile()"
+                class="w-full whatsapp-cta-btn py-3.5 rounded-2xl font-black text-sm mt-2 cursor-pointer">
+                שמור והתחבר לפורטל הנהגים 🚖
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    },
+
+    saveDriverProfile() {
+      const name = (document.getElementById('drvNameInput')?.value || '').trim();
+      const phone = (document.getElementById('drvPhoneInput')?.value || '').trim();
+      const vehicleName = document.getElementById('drvVehicleInput')?.value || 'מונית סדאן 4 מקומות';
+      const plateNumber = (document.getElementById('drvPlateInput')?.value || '').trim();
+      const region = (document.getElementById('drvRegionInput')?.value || 'נתב״ג וגוש דן').trim();
+
+      if (!name || !phone) {
+        showToast('אנא הזן שם נהג ומספר טלפון נייד', 'warning');
+        return;
+      }
+
+      const existingIdx = drivers.findIndex(d => d.phone === phone);
+      const drvObj = existingIdx >= 0
+        ? { ...drivers[existingIdx], name, phone, vehicleName, plateNumber, region }
+        : {
+            id: 'drv-' + Math.floor(100 + Math.random() * 900),
+            name,
+            phone,
+            vehicleName,
+            plateNumber,
+            region,
+            status: 'available_airport',
+            statusLabel: '✈️ פנוי עכשיו בנתב״ג',
+            completedRides: 0,
+            totalCommissionsPaid: 0,
+            rating: 5.0
+          };
+
+      if (existingIdx >= 0) {
+        drivers[existingIdx] = drvObj;
+      } else {
+        drivers.unshift(drvObj);
+      }
+      saveActiveDriver(drvObj);
+      saveDrivers(drvObj);
+      window.primeApp.closeModal();
+      showToast(`ברוך הבא ${name}! הפרופיל שלך נשמר בענן התחנה 🚖`);
+      renderAll();
+    },
+
+    refreshCloudNow() {
+      syncWithAwsCloud(false);
+      showToast('מסנכרן נתונים חיים מול ענן AWS... ☁️');
     },
 
     setView(view) {
@@ -2745,6 +3540,17 @@
 
   // Initialize on DOM ready
   document.addEventListener('DOMContentLoaded', () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const partnerParam = params.get('partner');
+      if (partnerParam === 'tal' || partnerParam === 'eliyahu') {
+        window.primeApp.quickPartnerLogin(partnerParam);
+      }
+    } catch (e) {}
     renderAll();
+    syncWithAwsCloud(true);
+    setInterval(() => {
+      syncWithAwsCloud(true);
+    }, 7000);
   });
 })();

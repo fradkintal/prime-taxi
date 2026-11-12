@@ -1,0 +1,19 @@
+{
+  "name": "פריים טקסי | PRIME TAXI ISRAEL",
+  "short_name": "פריים טקסי",
+  "description": "מערכת הזמנות מוניות ארצית לנתב״ג ובינעירוני, פורטל נהגים וממשק סדרן בזמן אמת",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "he-IL",
+  "background_color": "#070b14",
+  "theme_color": "#070b14",
+  "icons": [
+    {
+      "src": "./assets/logo-modern.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,12 +1,12 @@
 {
-  "version": "1.2.0",
+  "version": "2.0.0",
   "minVersion": "1.0.0",
-  "keyVersion": 1,
-  "buildNumber": 3,
-  "updatedAt": "2026-11-11T13:38:00+02:00",
-  "liveUrl": "https://fradkintal.github.io/prime-taxi/",
-  "repoUrl": "https://github.com/fradkintal/prime-taxi",
-  "firebaseProjectId": "tlator-759c6",
-  "awsRegion": "il-central-1",
-  "awsAccountId": "714303613666"
+  "keyVersion": 2,
+  "buildNumber": 5,
+  "updatedAt": "2026-11-12T12:26:45.703Z",
+  "cloudApiUrl": "",
+  "customerAwsUrl": "https://drllqs5t3fzo5.cloudfront.net",
+  "driverAwsUrl": "https://d2gkypncorjpuw.cloudfront.net",
+  "adminAwsUrl": "https://d1qjhe0ijgnja3.cloudfront.net",
+  "githubPagesUrl": "https://fradkintal.github.io/prime-taxi/"
 }
