@@ -1,9 +1,9 @@
 {
-  "version": "2.0.0",
+  "version": "3.0.0",
   "minVersion": "1.0.0",
-  "keyVersion": 2,
-  "buildNumber": 5,
-  "updatedAt": "2026-11-12T12:29:48.442Z",
+  "keyVersion": 3,
+  "buildNumber": 6,
+  "updatedAt": "2026-11-13T11:07:07.162Z",
   "cloudApiUrl": "https://lineqcewjmyzccqlxidpxx4fme0xsryh.lambda-url.eu-central-1.on.aws/",
   "customerAwsUrl": "https://drllqs5t3fzo5.cloudfront.net",
   "driverAwsUrl": "https://d2gkypncorjpuw.cloudfront.net",

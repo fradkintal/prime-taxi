@@ -22,7 +22,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Custom Luxury Theme Styles -->
-  <link rel="stylesheet" href="./src/styles.css?v=2.0.0" />
+  <link rel="stylesheet" href="./src/styles.css?v=3.0.0" />
 </head>
 <body class="min-h-screen flex flex-col bg-slate-100 text-slate-900 selection:bg-amber-400 selection:text-slate-950">
 
@@ -46,6 +46,7 @@
         <div class="flex flex-wrap items-center justify-center gap-2.5 text-xs font-bold">
           <button onclick="window.primeApp.setView('booking')" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:text-amber-400 transition cursor-pointer">🚕 מחשבון הזמנה ללקוח</button>
           <button onclick="window.primeApp.setView('driver')" class="px-3 py-1.5 rounded-lg bg-emerald-950 text-emerald-300 hover:bg-emerald-900 transition cursor-pointer">🚖 כניסת נהגים (לוח נסיעות)</button>
+          <button onclick="window.primeApp.setView('marketing')" class="px-3 py-1.5 rounded-lg bg-indigo-950 text-amber-300 hover:bg-indigo-900 border border-amber-400/40 transition cursor-pointer">🎬 פרסום, סרטונים ודגל לרכב</button>
           <button onclick="window.primeApp.setView('pricelist')" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:text-amber-400 transition cursor-pointer">📋 מחירון 78 ערים</button>
           <button onclick="window.primeApp.setView('admin')" class="px-3 py-1.5 rounded-lg bg-slate-900 text-amber-300 hover:bg-slate-800 transition cursor-pointer">⚡ ממשק מנהלים (טל ואליהו)</button>
         </div>
@@ -54,7 +55,7 @@
         <div>כל הזכויות שמורות © 2026 פריים טקסי (PRIME TAXI) — ניהול ותפעול: טל פרדקין (054-6373001) ואליהו (050-7676946)</div>
         <div class="flex items-center gap-2">
           <span class="px-2.5 py-0.5 rounded bg-emerald-950 text-emerald-300 font-bold border border-emerald-800">☁️ AWS Cloud + CloudFront CDN</span>
-          <span class="px-2.5 py-0.5 rounded bg-slate-900 text-amber-400 font-mono font-bold border border-slate-800">v2.0.0</span>
+          <span class="px-2.5 py-0.5 rounded bg-slate-900 text-amber-400 font-mono font-bold border border-slate-800">v3.0.0</span>
         </div>
       </div>
     </div>
@@ -64,8 +65,9 @@
   <div id="modalRoot"></div>
   <div id="toastContainer" class="fixed bottom-6 left-6 z-50 flex flex-col gap-2 max-w-sm"></div>
 
-  <!-- Pricing Database & Application Engine -->
-  <script src="./src/pricing-data.js?v=2.0.0"></script>
-  <script src="./src/app.js?v=2.0.0"></script>
+  <!-- Pricing Database, Marketing Studio & Application Engine -->
+  <script src="./src/pricing-data.js?v=3.0.0"></script>
+  <script src="./src/marketing-studio.js?v=3.0.0"></script>
+  <script src="./src/app.js?v=3.0.0"></script>
 </body>
 </html>

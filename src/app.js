@@ -22,8 +22,10 @@
   let currentUser = loadAuthUser();
 
   let state = {
-    activeView: detectInitialView(), // 'booking' | 'driver' | 'pricelist' | 'admin'
-    adminTab: 'orders',    // 'orders' | 'drivers' | 'analytics' | 'pricing' | 'branding' | 'auth_servers'
+    activeView: detectInitialView(), // 'booking' | 'driver' | 'marketing' | 'pricelist' | 'admin'
+    adminTab: 'orders',    // 'orders' | 'drivers' | 'analytics' | 'marketing' | 'pricing' | 'branding' | 'auth_servers'
+    adminOrderStatusFilter: 'all', // 'all' | 'new' | 'broadcasted' | 'assigned' | 'paid'
+    adminOrderSearch: '',
     driverFilter: 'all',   // 'all' | 'airport' | 'intercity' | 'delivery' | 'my_rides'
     cloudStatus: 'connected', // 'connected' | 'syncing' | 'local'
     lastCloudSyncAt: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -99,7 +101,7 @@
     try {
       const params = new URLSearchParams(window.location.search);
       const v = params.get('view');
-      if (v === 'driver' || v === 'admin' || v === 'pricelist' || v === 'booking') return v;
+      if (v === 'driver' || v === 'admin' || v === 'marketing' || v === 'pricelist' || v === 'booking') return v;
       const host = (window.location.hostname || '').toLowerCase();
       if (host.includes('d2gkypncorjpuw')) return 'driver';
       if (host.includes('d1qjhe0ijgnja3')) return 'admin';
@@ -925,16 +927,22 @@
           <button onclick="window.primeApp.setView('driver')"
             class="relative px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'driver' ? 'bg-emerald-400 text-slate-950 border-emerald-400 shadow-md' : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'}">
             <span>🚖</span>
-            <span class="hidden md:inline">כניסת נהגים (לוח נסיעות)</span>
+            <span class="hidden md:inline">כניסת נהגים</span>
             <span class="md:hidden">נהגים</span>
             ${openForDriversCount > 0 ? `<span class="bg-emerald-500 text-slate-950 text-[11px] font-black px-1.5 py-0.2 rounded-full">${openForDriversCount}</span>` : ''}
           </button>
 
+          <button onclick="window.primeApp.setView('marketing')"
+            class="px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'marketing' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-indigo-950/80 text-amber-300 border-amber-400/40 hover:bg-indigo-900/70'}">
+            <span>🎬</span>
+            <span class="hidden lg:inline">סרטונים, פוסטים ודגל לרכב</span>
+            <span class="lg:hidden">סרטונים/דגל</span>
+          </button>
+
           <button onclick="window.primeApp.setView('pricelist')"
-            class="px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
+            class="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
             <span>📋</span>
-            <span class="hidden lg:inline">מחירון ארצי</span>
-            <span class="lg:hidden">מחירון</span>
+            <span class="hidden xl:inline">מחירון</span>
           </button>
 
           <button onclick="window.primeApp.setView('admin')"
@@ -1024,15 +1032,65 @@
               מחשבון מחירים שקוף ומדויק מכל יישוב בארץ לנתב״ג ומעיר לעיר. בחרו מסלול, מספר נוסעים ומזוודות — וקבלו מונית חדישה ישירות ב-WhatsApp עם תשלום נוח ב-<strong>Bit</strong>, <strong>PayBox</strong>, מזומן או אשראי.
             </p>
             <!-- Quick Popular Routes Strip -->
-            <div class="mb-1">
+            <div class="mb-4">
               <div class="text-xs font-bold text-amber-300/90 mb-2">🔥 מסלולים מבוקשים בלחיצה מהירה (תעריף יום קבוע):</div>
               <div class="flex flex-wrap gap-2">
                 ${renderPopularQuickRoutes()}
               </div>
             </div>
+
+            <!-- Interactive Video Tutorials & Car Flag Quick Strip -->
+            <div class="bg-slate-950/85 border border-amber-400/40 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5">
+                <span class="text-2xl">🎬</span>
+                <div>
+                  <div class="text-xs font-black text-amber-300">חדש! סרטוני הדרכה קצרים (15 שניות) + מיתוג ודגל לרכב</div>
+                  <div class="text-[11px] text-slate-300">צפה איך מזמינים מונית לנתב״ג בקליק, או איך נהגים מתחברים ותופסים נסיעות בפורטל</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1.5 shrink-0">
+                <button onclick="window.primeApp.openVideoReelShortcut('cust_booking_15s')"
+                  class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black cursor-pointer">
+                  ▶️ סרטון ללקוח
+                </button>
+                <button onclick="window.primeApp.openVideoReelShortcut('driver_login_claim')"
+                  class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black cursor-pointer">
+                  🚖 סרטון לנהג
+                </button>
+                <button onclick="window.primeApp.openMerchShortcut()"
+                  class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 text-xs font-bold cursor-pointer">
+                  🚩 דגל לרכב ופוסטים
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
+
+      ${state.lastCreatedOrder ? (() => {
+        const liveOrd = orders.find(o => o.id === state.lastCreatedOrder.id) || state.lastCreatedOrder;
+        const stepNum = liveOrd.status === 'paid' || liveOrd.status === 'assigned' ? 3 : (liveOrd.status === 'broadcasted' ? 2 : 1);
+        return `
+          <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 mb-6">
+            <div class="bg-emerald-950 text-white rounded-3xl p-4 sm:p-5 border-2 border-emerald-400 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-xs font-black">מעקב הזמנה חי #${liveOrd.id}</span>
+                  <span class="text-sm font-black text-emerald-300">${stepNum === 3 ? `✅ נהג שובץ לנסיעה שלך (${liveOrd.assignedDriverName || 'נהג פריים טקסי'})!` : (stepNum === 2 ? '📢 הנסיעה שלך במכרז נהגים חי באזורך' : '⚡ ההזמנה נקלטה במוקד וממתינה לשיבוץ נהג')}</span>
+                </div>
+                <div class="text-xs text-slate-200 mt-1">📍 ${liveOrd.originLabel} ⬅ ${liveOrd.destLabel} | 💰 מחיר קבוע: ₪${liveOrd.totalPrice}</div>
+              </div>
+              <div class="flex items-center gap-2 text-xs font-black">
+                <span class="px-3 py-1.5 rounded-xl ${stepNum >= 1 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}">1. נקלט במוקד</span>
+                <span>←</span>
+                <span class="px-3 py-1.5 rounded-xl ${stepNum >= 2 ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'}">2. במכרז נהגים</span>
+                <span>←</span>
+                <span class="px-3 py-1.5 rounded-xl ${stepNum >= 3 ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-400'}">3. נהג שובץ!</span>
+              </div>
+            </div>
+          </div>
+        `;
+      })() : ''}
 
       <!-- Main Booking Calculator & Live Receipt Grid -->
       <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 pb-28 lg:pb-16 relative z-10">
@@ -1910,6 +1968,31 @@
               </button>
             `).join('')}
           </div>
+
+          <!-- Driver Video Guides & Car Flag Kit Banner -->
+          <div class="mt-4 pt-4 border-t border-emerald-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950/70 p-3.5 rounded-2xl border border-amber-400/30">
+            <div class="flex items-center gap-2.5">
+              <span class="text-2xl">🎬</span>
+              <div>
+                <div class="text-xs font-black text-amber-300">סרטוני הדרכה לנהגים + דגל לרכב ומגנט רשמי של התחנה</div>
+                <div class="text-[11px] text-slate-300">צפה איך תופסים נסיעה בפורטל, איך מעבירים עמלה ב-Bit/PayBox ואיך מקבלים ערכת דגל לרכב</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5 shrink-0">
+              <button onclick="window.primeApp.openVideoReelShortcut('driver_login_claim')"
+                class="px-3 py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-black cursor-pointer">
+                ▶️ איך מתחברים ותופסים נסיעה
+              </button>
+              <button onclick="window.primeApp.openVideoReelShortcut('driver_bit_unlock')"
+                class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black cursor-pointer">
+                💸 תשלום עמלה בביט ופתיחת לקוח
+              </button>
+              <button onclick="window.primeApp.openMerchShortcut()"
+                class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 text-xs font-bold cursor-pointer">
+                🚩 דגל לרכב וערכת נהג
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- My Claimed Rides (Commission Payment & Customer Unlock) -->
@@ -2204,6 +2287,7 @@
           ${[
             { id: 'orders', label: '📲 יומן נסיעות ושיבוץ נהגים', count: orders.length },
             { id: 'drivers', label: '🚖 מאגר נהגים וזמינות חיה', count: drivers.length },
+            { id: 'marketing', label: '🎬 סטודיו פרסום, סרטונים, פוסטים ודגל לרכב', count: 8 },
             { id: 'analytics', label: '📊 ניתוחים ודוחות רווחיות (BI)' },
             { id: 'pricing', label: '💰 עריכת מחירון ואחוזי עמלה' },
             { id: 'branding', label: '🎨 מיתוג ולוגו' },
@@ -2219,6 +2303,7 @@
 
         ${state.adminTab === 'orders' ? renderAdminOrdersTab() : ''}
         ${state.adminTab === 'drivers' ? renderAdminDriversTab() : ''}
+        ${state.adminTab === 'marketing' ? (window.PRIME_TAXI_MARKETING ? window.PRIME_TAXI_MARKETING.renderView(settings) : '') : ''}
         ${state.adminTab === 'analytics' ? renderAdminAnalyticsTab() : ''}
         ${state.adminTab === 'auth_servers' ? renderAdminAuthServersTab() : ''}
         ${state.adminTab === 'branding' ? renderAdminBrandingTab() : ''}
@@ -2235,9 +2320,65 @@
       paid: { label: 'בוצע + עמלה שולמה בביט/פייבוקס ✅', cls: 'bg-emerald-100 text-emerald-900 border-emerald-300' }
     };
 
+    const counts = {
+      all: orders.length,
+      new: orders.filter(o => o.status === 'new').length,
+      broadcasted: orders.filter(o => o.status === 'broadcasted').length,
+      assigned: orders.filter(o => o.status === 'assigned').length,
+      paid: orders.filter(o => o.status === 'paid').length
+    };
+
+    const q = (state.adminOrderSearch || '').trim().toLowerCase();
+    const filteredOrders = orders.filter(o => {
+      if (state.adminOrderStatusFilter !== 'all' && o.status !== state.adminOrderStatusFilter) return false;
+      if (!q) return true;
+      return (
+        String(o.id || '').toLowerCase().includes(q) ||
+        String(o.customerName || '').toLowerCase().includes(q) ||
+        String(o.customerPhone || '').toLowerCase().includes(q) ||
+        String(o.originLabel || '').toLowerCase().includes(q) ||
+        String(o.destLabel || '').toLowerCase().includes(q) ||
+        String(o.assignedDriverName || '').toLowerCase().includes(q)
+      );
+    });
+
     return `
+      <!-- Dispatcher Filter, Search & Excel Export Toolbar -->
+      <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm mb-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex flex-wrap gap-2">
+          ${[
+            { id: 'all', label: `הכל (${counts.all})` },
+            { id: 'new', label: `🔥 חדשות (${counts.new})` },
+            { id: 'broadcasted', label: `📢 במכרז נהגים (${counts.broadcasted})` },
+            { id: 'assigned', label: `🚖 שובצו וממתינות לעמלה (${counts.assigned})` },
+            { id: 'paid', label: `✅ שולמו בביט/פייבוקס (${counts.paid})` }
+          ].map(f => `
+            <button onclick="window.primeApp.setAdminOrderFilter('${f.id}')"
+              class="px-3.5 py-2 rounded-xl text-xs font-extrabold transition cursor-pointer ${state.adminOrderStatusFilter === f.id ? 'bg-slate-900 text-amber-400 shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+              ${f.label}
+            </button>
+          `).join('')}
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5">
+          <input type="text" value="${state.adminOrderSearch || ''}" placeholder="🔍 חפש לפי שם לקוח, טלפון, עיר או #הזמנה..."
+            oninput="window.primeApp.setAdminOrderSearch(this.value)"
+            class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-900 min-w-[230px] focus:border-amber-500 focus:outline-none" />
+          <button onclick="window.primeApp.exportOrdersCsv()"
+            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shadow-sm cursor-pointer">
+            <span>📊</span>
+            <span>ייצוא דוח ל-Excel / CSV</span>
+          </button>
+        </div>
+      </div>
+
       <div class="space-y-4">
-        ${orders.map(order => {
+        ${filteredOrders.length === 0 ? `
+          <div class="bg-white rounded-3xl p-10 text-center border border-slate-200">
+            <div class="text-3xl mb-2">🚕</div>
+            <div class="font-black text-slate-900">לא נמצאו הזמנות בסינון הנוכחי</div>
+          </div>
+        ` : filteredOrders.map(order => {
           const st = statusBadges[order.status] || statusBadges.new;
           return `
             <div class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:shadow-md transition">
@@ -2247,6 +2388,11 @@
                   <span class="text-xs font-extrabold px-3 py-1 rounded-full border ${st.cls}">${st.label}</span>
                   <span class="text-xs text-slate-500 font-bold">🕒 ${order.createdAt}</span>
                   <span class="text-xs font-extrabold bg-slate-100 text-slate-800 px-2.5 py-1 rounded-lg">${order.serviceLabel}</span>
+                  ${order.assignedDriverName ? `
+                    <span class="text-xs font-black bg-emerald-50 text-emerald-900 border border-emerald-300 px-3 py-1 rounded-lg">
+                      🚖 נהג משובץ: ${order.assignedDriverName} (${order.assignedDriverPhone || ''})
+                    </span>
+                  ` : ''}
                 </div>
 
                 <!-- Price & Commission Breakdown Pill -->
@@ -2292,6 +2438,19 @@
                 </div>
               </div>
 
+              <!-- Direct Driver Assignment Bar -->
+              <div class="mb-4 p-3 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <span class="font-extrabold text-slate-700">🚖 שיבוץ ישיר לנהג מהמאגר (או החלפת נהג בקליק):</span>
+                <div class="flex flex-wrap gap-1.5">
+                  ${drivers.map(d => `
+                    <button onclick="window.primeApp.assignDriverToOrder('${order.id}', '${d.id}')"
+                      class="px-3 py-1.5 rounded-xl font-bold border transition cursor-pointer ${order.assignedDriverPhone === d.phone ? 'bg-emerald-600 text-white border-emerald-700 font-black' : 'bg-white hover:bg-amber-50 text-slate-800 border-slate-300'}">
+                      ${order.assignedDriverPhone === d.phone ? '✓ ' : ''}${d.name} (${d.vehicleName.split(' ')[0]})
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+
               <!-- 3-Step Driver Dispatch & Commission Actions -->
               <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
                 <div class="flex flex-wrap gap-2">
@@ -2318,6 +2477,10 @@
                   <button onclick="window.primeApp.toggleOrderPaid('${order.id}')"
                     class="px-3.5 py-2 rounded-xl text-xs font-extrabold border transition cursor-pointer ${order.status === 'paid' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-sky-50 text-sky-900 border-sky-200 hover:bg-sky-100'}">
                     ${order.status === 'paid' ? '✅ העמלה שולמה בביט/פייבוקס' : `💸 סמן שקיבלת ₪${order.commissionAmount} בביט/פייבוקס`}
+                  </button>
+                  <button onclick="window.primeApp.deleteOrder('${order.id}')" title="מחק הזמנה"
+                    class="px-2.5 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer">
+                    🗑️
                   </button>
                 </div>
               </div>
@@ -2937,15 +3100,111 @@
       mainEl.innerHTML = renderBookingView();
     } else if (state.activeView === 'driver') {
       mainEl.innerHTML = renderDriverView();
+    } else if (state.activeView === 'marketing') {
+      mainEl.innerHTML = window.PRIME_TAXI_MARKETING ? window.PRIME_TAXI_MARKETING.renderView(settings) : '';
+      setTimeout(() => {
+        if (window.PRIME_TAXI_MARKETING) window.PRIME_TAXI_MARKETING.initAfterRender(settings);
+      }, 60);
     } else if (state.activeView === 'pricelist') {
       mainEl.innerHTML = renderPricelistView();
     } else if (state.activeView === 'admin') {
       mainEl.innerHTML = renderAdminView();
+      if (state.adminTab === 'marketing') {
+        setTimeout(() => {
+          if (window.PRIME_TAXI_MARKETING) window.PRIME_TAXI_MARKETING.initAfterRender(settings);
+        }, 60);
+      }
     }
   }
 
   // --- Public Controller API ---
   window.primeApp = {
+    rerender() {
+      renderAll();
+    },
+
+    openVideoReelShortcut(reelId) {
+      state.activeView = 'marketing';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      renderAll();
+      setTimeout(() => {
+        if (window.PRIME_TAXI_MARKETING) {
+          window.PRIME_TAXI_MARKETING.setSubTab('videos');
+          if (reelId) window.PRIME_TAXI_MARKETING.selectReel(reelId);
+        }
+      }, 90);
+    },
+
+    openMerchShortcut() {
+      state.activeView = 'marketing';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      renderAll();
+      setTimeout(() => {
+        if (window.PRIME_TAXI_MARKETING) {
+          window.PRIME_TAXI_MARKETING.setSubTab('merch');
+        }
+      }, 90);
+    },
+
+    setAdminOrderFilter(filterId) {
+      state.adminOrderStatusFilter = filterId;
+      renderAll();
+    },
+
+    setAdminOrderSearch(query) {
+      state.adminOrderSearch = query;
+      renderAll();
+    },
+
+    assignDriverToOrder(orderId, driverId) {
+      const order = orders.find(o => o.id === orderId);
+      const drv = drivers.find(d => d.id === driverId);
+      if (!order || !drv) return;
+      order.status = order.status === 'paid' ? 'paid' : 'assigned';
+      order.assignedDriverName = drv.name;
+      order.assignedDriverPhone = drv.phone;
+      order.assignedDriverVehicle = drv.vehicleName;
+      saveOrders(order);
+      showToast(`נהג ${drv.name} (${drv.phone}) שובץ לנסיעה #${order.id}! 🚖`);
+      renderAll();
+    },
+
+    deleteOrder(orderId) {
+      orders = orders.filter(o => o.id !== orderId);
+      saveOrders();
+      showToast(`הזמנה #${orderId} הוסרה מיומן הנסיעות 🗑️`);
+      renderAll();
+    },
+
+    exportOrdersCsv() {
+      const headers = ['מספר הזמנה', 'זמן יצירה', 'שירות', 'מוצא', 'יעד', 'שעת איסוף', 'שם לקוח', 'טלפון לקוח', 'מחיר ללקוח (₪)', 'עמלת תחנה (₪)', 'נטו לנהג (₪)', 'סטטוס', 'נהג משובץ', 'טלפון נהג'];
+      const rows = orders.map(o => [
+        o.id,
+        o.createdAt,
+        o.serviceLabel,
+        o.originLabel,
+        o.destLabel,
+        o.pickupTimeLabel,
+        o.customerName,
+        o.customerPhone,
+        o.totalPrice,
+        o.commissionAmount,
+        o.driverNet,
+        o.status,
+        o.assignedDriverName || '',
+        o.assignedDriverPhone || ''
+      ].map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','));
+      const csv = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prime-taxi-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showToast('דוח ההזמנות והעמלות יורד כעת כקובץ Excel / CSV! 📊');
+    },
+
     openAuthModal(defaultPhone = '') {
       if (typeof defaultPhone === 'boolean') {
         state.pendingAdminRedirect = defaultPhone;
