@@ -812,7 +812,7 @@ window.PRIME_TAXI_MARKETING = (function () {
             <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
               <h4 class="text-base font-black text-slate-900">📸 הדמיית דגל לרכב ומיתוג מונית פריים טקסי</h4>
               <img src="./public/assets/car-flag-mockup.jpg" onerror="this.src='./public/assets/hero-airport.jpg'" alt="Car Flag Mockup" class="w-full h-56 object-cover rounded-2xl border border-amber-400/50 shadow" />
-              <p class="text-xs text-slate-600">דגל בד פוליאסטר כפול (`45×30 ס״מ`) על מוט פלסטיק קשיח לתפיסה על חלון אחורי של המונית + סמל מגנטי לדלת.</p>
+              <p class="text-xs text-slate-600">דגל בד פוליאסטר כפול (45×30 ס״מ) על מוט פלסטיק קשיח לתפיסה על חלון אחורי של המונית + סמל מגנטי לדלת.</p>
             </div>
 
             <div class="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
