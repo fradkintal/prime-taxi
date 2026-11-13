@@ -103,10 +103,10 @@ if (functionUrl) {
 
 const versionPath = path.join(rootDir, 'version.json');
 const versionObj = {
-  version: '3.0.0',
+  version: '3.1.0',
   minVersion: '1.0.0',
   keyVersion: 3,
-  buildNumber: 6,
+  buildNumber: 7,
   updatedAt: new Date().toISOString(),
   cloudApiUrl: functionUrl,
   customerAwsUrl: 'https://drllqs5t3fzo5.cloudfront.net',
@@ -159,10 +159,10 @@ for (const t of targets) {
 }
 
 // 5. Commit and push to GitHub
-console.log('Committing and pushing v3.0.0 to GitHub...');
+console.log('Committing and pushing v3.1.0 to GitHub...');
 try {
   execFileSync(gitExe, ['add', '-A'], { cwd: rootDir, stdio: 'inherit' });
-  execFileSync(gitExe, ['commit', '-m', 'v3.0.0'], { cwd: rootDir, stdio: 'inherit' });
+  execFileSync(gitExe, ['commit', '-m', 'v3.1.0 - Mobile & Multi-View Verified'], { cwd: rootDir, stdio: 'inherit' });
   execFileSync(gitExe, ['push', 'origin', 'main'], { cwd: rootDir, stdio: 'inherit' });
 } catch (e) {
   console.log('Git push note:', e.message);

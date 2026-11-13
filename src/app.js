@@ -546,13 +546,13 @@
       baseRouteFare = isNight ? originCity.airportNight : originCity.airportDay;
       roadKm = originCity.kmAirport;
       estMin = originCity.etaAirportMin;
-      routeTitle = `${originCity.name}  נתב״ג (טרמינל ${state.terminal})`;
+      routeTitle = `${originCity.name} ⬅ נתב״ג (טרמינל ${state.terminal})`;
       routeSubtitle = `איסוף ספיישל מהבית ישירות לטרמינל ${state.terminal}`;
     } else if (state.serviceType === 'from_airport') {
       baseRouteFare = isNight ? destCity.airportNight : destCity.airportDay;
       roadKm = destCity.kmAirport;
       estMin = destCity.etaAirportMin;
-      routeTitle = `נתב״ג (טרמינל ${state.terminal})  ${destCity.name}`;
+      routeTitle = `נתב״ג (טרמינל ${state.terminal}) ⬅ ${destCity.name}`;
       routeSubtitle = state.flightNumber
         ? `מעקב נחיתה אוטומטי אחר טיסה ${state.flightNumber.toUpperCase()}`
         : `איסוף מטרמינל ${state.terminal} בתיאום נחיתה`;
@@ -561,7 +561,7 @@
       baseRouteFare = isNight ? metrics.night : metrics.day;
       roadKm = metrics.km;
       estMin = metrics.min;
-      routeTitle = `${originCity.name}  ${destCity.name}`;
+      routeTitle = `${originCity.name} ⬅ ${destCity.name}`;
       routeSubtitle = `נסיעה בינעירונית ישירה מנקודה לנקודה`;
     } else if (state.serviceType === 'delivery') {
       const metrics = computeIntercityMetrics(originCity, destCity);
@@ -570,7 +570,7 @@
       baseRouteFare = Math.max(pkg.minPrice, Math.round((rawFare * pkg.multiplier) / 5) * 5);
       roadKm = metrics.km;
       estMin = metrics.min;
-      routeTitle = `משלוח: ${originCity.name}  ${destCity.name}`;
+      routeTitle = `משלוח: ${originCity.name} ⬅ ${destCity.name}`;
       routeSubtitle = `${pkg.name} • מסירה ישירה`;
     }
 
@@ -899,73 +899,116 @@
     if (!headerEl) return;
 
     headerEl.innerHTML = `
-      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-2">
-        <!-- Brand Identity -->
-        <div class="flex items-center gap-2.5 sm:gap-3 cursor-pointer shrink-0" onclick="window.primeApp.setView('booking')">
-          <div class="relative">
-            <img src="${logoSrc}" alt="${settings.brandNameHe}" class="w-11 h-11 sm:w-14 sm:h-14 rounded-2xl object-cover border-2 border-amber-400/80 shadow-lg shadow-amber-500/20" />
-            <span class="absolute -bottom-1 -left-1 bg-emerald-500 w-3.5 h-3.5 rounded-full border-2 border-slate-950" title="מחובר לענן AWS חי 24/7"></span>
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-base sm:text-2xl font-black tracking-tight text-white">${settings.brandNameHe}</span>
-              <span class="hidden lg:inline-block text-xs font-extrabold px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30">${settings.brandNameEn}</span>
+      <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 lg:py-0 lg:h-20 flex flex-col justify-center gap-2">
+        <div class="flex items-center justify-between gap-2">
+          <!-- Brand Identity -->
+          <div class="flex items-center gap-2.5 sm:gap-3 cursor-pointer shrink-0" onclick="window.primeApp.setView('booking')">
+            <div class="relative">
+              <img src="${logoSrc}" alt="${settings.brandNameHe}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-cover border-2 border-amber-400/80 shadow-lg shadow-amber-500/20" />
+              <span class="absolute -bottom-0.5 -left-0.5 bg-emerald-500 w-3 h-3 rounded-full border-2 border-slate-950" title="מחובר לענן AWS חי 24/7"></span>
             </div>
-            <p class="text-[11px] text-slate-300 hidden xl:block">${settings.brandSlogan}</p>
+            <div>
+              <div class="flex items-center gap-1.5 sm:gap-2">
+                <span class="text-base sm:text-2xl font-black tracking-tight text-white leading-none">${settings.brandNameHe}</span>
+                <span class="text-[10px] sm:text-xs font-extrabold px-1.5 py-0.5 rounded-md bg-amber-400/15 text-amber-300 border border-amber-400/30">${settings.brandNameEn}</span>
+              </div>
+              <p class="text-[11px] text-slate-300 hidden xl:block mt-0.5">${settings.brandSlogan}</p>
+            </div>
+          </div>
+
+          <!-- Desktop Navigation (lg+) + Mobile Quick Auth/WhatsApp -->
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <!-- Desktop Tabs (lg+) -->
+            <div class="hidden lg:flex items-center gap-1.5 xl:gap-2">
+              <button onclick="window.primeApp.setView('booking')"
+                class="whitespace-nowrap px-3 py-2 rounded-xl text-xs xl:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'booking' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
+                <span>🚕</span>
+                <span>הזמנת מונית</span>
+              </button>
+
+              <button onclick="window.primeApp.setView('driver')"
+                class="whitespace-nowrap relative px-3 py-2 rounded-xl text-xs xl:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'driver' ? 'bg-emerald-400 text-slate-950 border-emerald-400 shadow-md' : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'}">
+                <span>🚖</span>
+                <span>כניסת נהגים</span>
+                ${openForDriversCount > 0 ? `<span class="bg-emerald-500 text-slate-950 text-[11px] font-black px-1.5 py-0.2 rounded-full">${openForDriversCount}</span>` : ''}
+              </button>
+
+              <button onclick="window.primeApp.setView('marketing')"
+                class="whitespace-nowrap px-3 py-2 rounded-xl text-xs xl:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'marketing' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-indigo-950/80 text-amber-300 border-amber-400/40 hover:bg-indigo-900/70'}">
+                <span>🎬</span>
+                <span>סרטונים, פוסטים ודגל</span>
+              </button>
+
+              <button onclick="window.primeApp.setView('pricelist')"
+                class="whitespace-nowrap px-3 py-2 rounded-xl text-xs xl:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
+                <span>📋</span>
+                <span>מחירון</span>
+              </button>
+
+              <button onclick="window.primeApp.setView('admin')"
+                class="whitespace-nowrap relative px-3 py-2 rounded-xl text-xs xl:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'admin' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-slate-900/90 text-amber-300 border-amber-500/40 hover:bg-slate-800'}">
+                <span>⚡</span>
+                <span>ניהול וסדרן</span>
+                ${newOrdersCount > 0 ? `<span class="bg-rose-500 text-white text-[11px] font-black px-1.5 py-0.2 rounded-full">${newOrdersCount}</span>` : ''}
+              </button>
+            </div>
+
+            <!-- Direct WhatsApp Icon on Mobile/Tablet (< lg) -->
+            <a href="https://wa.me/${formatCleanIntlPhone(settings.whatsappPhone)}" target="_blank"
+              class="lg:hidden px-2.5 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-black flex items-center gap-1 shadow whitespace-nowrap">
+              <span>💬</span>
+              <span>מוקד</span>
+            </a>
+
+            ${currentUser ? `
+              <button onclick="window.primeApp.openAuthModal()"
+                class="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25 transition flex items-center gap-1 cursor-pointer whitespace-nowrap">
+                <span>${currentUser.role === 'super_admin' ? '👑' : (currentUser.role === 'driver' ? '🚖' : '👤')}</span>
+                <span class="max-w-[75px] sm:max-w-[95px] truncate">${currentUser.name.split(' ')[0]}</span>
+              </button>
+            ` : `
+              <button onclick="window.primeApp.openAuthModal()"
+                class="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 transition flex items-center gap-1 cursor-pointer whitespace-nowrap">
+                <span>🔐</span>
+                <span>כניסה</span>
+              </button>
+            `}
           </div>
         </div>
 
-        <!-- Navigation & Auth Pills -->
-        <div class="flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+        <!-- Mobile & Tablet 5-Tab Segmented Bar (< lg) -->
+        <div class="grid grid-cols-5 gap-1 pt-1.5 border-t border-slate-800/90 lg:hidden">
           <button onclick="window.primeApp.setView('booking')"
-            class="px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'booking' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
-            <span>🚕</span>
-            <span class="hidden sm:inline">הזמנת מונית</span>
-            <span class="sm:hidden">הזמנה</span>
+            class="py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black transition flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer ${state.activeView === 'booking' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-900/90 text-slate-200'}">
+            <span class="text-sm leading-none">🚕</span>
+            <span>הזמנה</span>
           </button>
 
           <button onclick="window.primeApp.setView('driver')"
-            class="relative px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'driver' ? 'bg-emerald-400 text-slate-950 border-emerald-400 shadow-md' : 'bg-emerald-950/70 text-emerald-300 border-emerald-500/40 hover:bg-emerald-900/60'}">
-            <span>🚖</span>
-            <span class="hidden md:inline">כניסת נהגים</span>
-            <span class="md:hidden">נהגים</span>
-            ${openForDriversCount > 0 ? `<span class="bg-emerald-500 text-slate-950 text-[11px] font-black px-1.5 py-0.2 rounded-full">${openForDriversCount}</span>` : ''}
+            class="relative py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black transition flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer ${state.activeView === 'driver' ? 'bg-emerald-400 text-slate-950 shadow' : 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/30'}">
+            <span class="text-sm leading-none">🚖</span>
+            <span>נהגים</span>
+            ${openForDriversCount > 0 ? `<span class="absolute -top-1 -left-1 bg-emerald-400 text-slate-950 text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-slate-950">${openForDriversCount}</span>` : ''}
           </button>
 
           <button onclick="window.primeApp.setView('marketing')"
-            class="px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'marketing' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-indigo-950/80 text-amber-300 border-amber-400/40 hover:bg-indigo-900/70'}">
-            <span>🎬</span>
-            <span class="hidden lg:inline">סרטונים, פוסטים ודגל לרכב</span>
-            <span class="lg:hidden">סרטונים/דגל</span>
+            class="py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black transition flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer ${state.activeView === 'marketing' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-indigo-950/90 text-amber-300 border border-amber-400/30'}">
+            <span class="text-sm leading-none">🎬</span>
+            <span>סרטונים/דגל</span>
           </button>
 
           <button onclick="window.primeApp.setView('pricelist')"
-            class="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 cursor-pointer ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow-md' : 'text-slate-200 hover:bg-slate-800'}">
-            <span>📋</span>
-            <span class="hidden xl:inline">מחירון</span>
+            class="py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black transition flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer ${state.activeView === 'pricelist' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-900/90 text-slate-200'}">
+            <span class="text-sm leading-none">📋</span>
+            <span>מחירון</span>
           </button>
 
           <button onclick="window.primeApp.setView('admin')"
-            class="relative px-2.5 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold transition flex items-center gap-1.5 border cursor-pointer ${state.activeView === 'admin' ? 'bg-amber-400 text-slate-950 border-amber-400 shadow-md' : 'bg-slate-900/90 text-amber-300 border-amber-500/40 hover:bg-slate-800'}">
-            <span>⚡</span>
-            <span class="hidden sm:inline">ניהול וסדרן</span>
-            <span class="sm:hidden">סדרן</span>
-            ${newOrdersCount > 0 ? `<span class="bg-rose-500 text-white text-[11px] font-black px-1.5 py-0.2 rounded-full">${newOrdersCount}</span>` : ''}
+            class="relative py-1.5 px-1 rounded-xl text-[11px] sm:text-xs font-black transition flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 cursor-pointer ${state.activeView === 'admin' ? 'bg-amber-400 text-slate-950 shadow' : 'bg-slate-900/90 text-amber-300 border border-amber-500/30'}">
+            <span class="text-sm leading-none">⚡</span>
+            <span>סדרן</span>
+            ${newOrdersCount > 0 ? `<span class="absolute -top-1 -left-1 bg-rose-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-slate-950">${newOrdersCount}</span>` : ''}
           </button>
-
-          ${currentUser ? `
-            <button onclick="window.primeApp.openAuthModal()"
-              class="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/25 transition flex items-center gap-1.5 cursor-pointer">
-              <span>${currentUser.role === 'super_admin' ? '👑' : (currentUser.role === 'driver' ? '🚖' : '👤')}</span>
-              <span class="max-w-[80px] truncate">${currentUser.name}</span>
-            </button>
-          ` : `
-            <button onclick="window.primeApp.openAuthModal()"
-              class="px-2.5 sm:px-3 py-2 rounded-xl text-xs sm:text-sm font-extrabold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition flex items-center gap-1.5 cursor-pointer">
-              <span>🔐</span>
-              <span class="hidden sm:inline">התחברות</span>
-            </button>
-          `}
         </div>
       </div>
     `;
@@ -973,22 +1016,21 @@
 
   function renderPopularQuickRoutes() {
     const quickRoutes = [
-      { label: 'תל אביב  נתב״ג', cityId: 'tlv', mode: 'to_airport', price: getCityById('tlv').airportDay },
-      { label: 'ירושלים  נתב״ג', cityId: 'jerusalem', mode: 'to_airport', price: getCityById('jerusalem').airportDay },
-      { label: 'ראשון לציון  נתב״ג', cityId: 'rishon', mode: 'to_airport', price: getCityById('rishon').airportDay },
-      { label: 'רמת גן / ב״ב  נתב״ג', cityId: 'ramat-gan', mode: 'to_airport', price: getCityById('ramat-gan').airportDay },
-      { label: 'מודיעין  נתב״ג', cityId: 'modiin', mode: 'to_airport', price: getCityById('modiin').airportDay },
-      { label: 'נתניה  נתב״ג', cityId: 'netanya', mode: 'to_airport', price: getCityById('netanya').airportDay },
-      { label: 'חיפה  נתב״ג', cityId: 'haifa', mode: 'to_airport', price: getCityById('haifa').airportDay },
-      { label: 'באר שבע  נתב״ג', cityId: 'beer-sheva', mode: 'to_airport', price: getCityById('beer-sheva').airportDay }
+      { label: 'תל אביב ⬅ נתב״ג', cityId: 'tlv', mode: 'to_airport', price: getCityById('tlv').airportDay },
+      { label: 'ירושלים ⬅ נתב״ג', cityId: 'jerusalem', mode: 'to_airport', price: getCityById('jerusalem').airportDay },
+      { label: 'ראשל״צ ⬅ נתב״ג', cityId: 'rishon', mode: 'to_airport', price: getCityById('rishon').airportDay },
+      { label: 'ר״ג / ב״ב ⬅ נתב״ג', cityId: 'ramat-gan', mode: 'to_airport', price: getCityById('ramat-gan').airportDay },
+      { label: 'מודיעין ⬅ נתב״ג', cityId: 'modiin', mode: 'to_airport', price: getCityById('modiin').airportDay },
+      { label: 'נתניה ⬅ נתב״ג', cityId: 'netanya', mode: 'to_airport', price: getCityById('netanya').airportDay },
+      { label: 'חיפה ⬅ נתב״ג', cityId: 'haifa', mode: 'to_airport', price: getCityById('haifa').airportDay },
+      { label: 'באר שבע ⬅ נתב״ג', cityId: 'beer-sheva', mode: 'to_airport', price: getCityById('beer-sheva').airportDay }
     ];
 
     return quickRoutes.map(r => `
       <button onclick="window.primeApp.selectQuickRoute('${r.cityId}', '${r.mode}')"
-        class="flex items-center gap-2 bg-slate-900/85 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-400/60 text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition shadow-sm">
-        <span>✈️</span>
-        <span>${r.label}</span>
-        <span class="text-amber-400 font-black">₪${r.price}</span>
+        class="flex items-center justify-between sm:justify-start gap-1.5 bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-400/60 text-white px-2.5 sm:px-3 py-2 rounded-xl text-[11px] sm:text-sm font-bold transition shadow-sm cursor-pointer min-w-0">
+        <span class="truncate">✈️ ${r.label}</span>
+        <span class="text-amber-400 font-black shrink-0">₪${r.price}</span>
       </button>
     `).join('');
   }
@@ -1034,32 +1076,32 @@
             <!-- Quick Popular Routes Strip -->
             <div class="mb-4">
               <div class="text-xs font-bold text-amber-300/90 mb-2">🔥 מסלולים מבוקשים בלחיצה מהירה (תעריף יום קבוע):</div>
-              <div class="flex flex-wrap gap-2">
+              <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
                 ${renderPopularQuickRoutes()}
               </div>
             </div>
 
             <!-- Interactive Video Tutorials & Car Flag Quick Strip -->
-            <div class="bg-slate-950/85 border border-amber-400/40 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="bg-slate-950/90 border border-amber-400/40 rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
               <div class="flex items-center gap-2.5">
-                <span class="text-2xl">🎬</span>
+                <span class="text-2xl shrink-0">🎬</span>
                 <div>
                   <div class="text-xs font-black text-amber-300">חדש! סרטוני הדרכה קצרים (15 שניות) + מיתוג ודגל לרכב</div>
                   <div class="text-[11px] text-slate-300">צפה איך מזמינים מונית לנתב״ג בקליק, או איך נהגים מתחברים ותופסים נסיעות בפורטל</div>
                 </div>
               </div>
-              <div class="flex flex-wrap gap-1.5 shrink-0">
-                <button onclick="window.primeApp.openVideoReelShortcut('cust_booking_15s')"
-                  class="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black cursor-pointer">
-                  ▶️ סרטון ללקוח
+              <div class="grid grid-cols-3 sm:flex gap-1.5 shrink-0">
+                <button onclick="window.primeApp.openVideoReelShortcut('vid_cust_booking')"
+                  class="px-2.5 sm:px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-[11px] sm:text-xs font-black cursor-pointer text-center">
+                  ▶️ ללקוח
                 </button>
-                <button onclick="window.primeApp.openVideoReelShortcut('driver_login_claim')"
-                  class="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black cursor-pointer">
-                  🚖 סרטון לנהג
+                <button onclick="window.primeApp.openVideoReelShortcut('vid_driver_onboarding')"
+                  class="px-2.5 sm:px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[11px] sm:text-xs font-black cursor-pointer text-center">
+                  🚖 לנהג
                 </button>
                 <button onclick="window.primeApp.openMerchShortcut()"
-                  class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 text-xs font-bold cursor-pointer">
-                  🚩 דגל לרכב ופוסטים
+                  class="px-2.5 sm:px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/40 text-[11px] sm:text-xs font-bold cursor-pointer text-center">
+                  🚩 דגל ופוסטים
                 </button>
               </div>
             </div>
@@ -1360,8 +1402,8 @@
           </div>
 
           <!-- Left Column (RTL): Sticky Live Pricing & WhatsApp Dispatch Receipt (5 cols) -->
-          <div class="lg:col-span-5 lg:sticky lg:top-24 space-y-5">
-            <div class="receipt-card rounded-3xl p-6 text-white relative overflow-hidden">
+          <div id="liveReceiptCard" class="lg:col-span-5 lg:sticky lg:top-24 space-y-5">
+            <div class="receipt-card rounded-3xl p-5 sm:p-6 text-white relative overflow-hidden">
               <div class="flex items-center justify-between border-b border-slate-700/80 pb-4 mb-4">
                 <div>
                   <span class="text-xs font-extrabold uppercase tracking-wider text-amber-400 block">סיכום והצעת מחיר מיידית</span>
@@ -1502,19 +1544,25 @@
       ${renderLandingBottomSections()}
 
       <!-- Mobile Sticky Bottom Bar -->
-      <div class="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-slate-950/95 backdrop-blur-md border-t border-amber-500/30 px-4 py-3 flex items-center justify-between gap-3">
-        <div>
-          <span class="text-[11px] text-slate-400 block">${calc.routeTitle}</span>
-          <div class="flex items-baseline gap-2">
+      <div class="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-slate-950/95 backdrop-blur-md border-t border-amber-500/30 px-3.5 pt-2.5 safe-bottom-bar flex items-center justify-between gap-2.5 shadow-2xl">
+        <div class="min-w-0">
+          <span class="text-[11px] text-slate-300 truncate block">${calc.routeTitle}</span>
+          <div class="flex items-baseline gap-1.5">
             <span class="text-2xl font-black text-amber-400">₪${calc.finalTotal}</span>
-            <span class="text-[11px] text-emerald-400 font-bold">מחיר קבוע</span>
+            <span class="text-[10px] text-emerald-400 font-bold">פיקס</span>
           </div>
         </div>
-        <button type="button" onclick="window.primeApp.submitBooking()"
-          class="whatsapp-cta-btn px-5 py-3 rounded-xl text-sm font-black flex items-center gap-2">
-          <span>💬</span>
-          <span>הזמן ב-WhatsApp</span>
-        </button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="document.getElementById('liveReceiptCard')?.scrollIntoView({behavior: 'smooth'})"
+            class="px-3 py-3 rounded-xl bg-slate-800 text-amber-300 border border-slate-700 text-xs font-extrabold cursor-pointer">
+            📋 פירוט
+          </button>
+          <button type="button" onclick="window.primeApp.submitBooking()"
+            class="whatsapp-cta-btn px-4 py-3 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 cursor-pointer">
+            <span>💬</span>
+            <span>הזמן ב-WhatsApp</span>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -1819,7 +1867,43 @@
           </div>
         </div>
 
-        <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+        <!-- Mobile & Tablet Pricelist Cards (< lg) -->
+        <div class="lg:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${filtered.map(c => {
+            const minivanPrice = Math.round((c.airportDay * 1.45) / 5) * 5;
+            return `
+              <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div>
+                    <div class="text-base font-black text-slate-900">${c.name}</div>
+                    <div class="text-xs text-slate-500 font-bold">${c.region} • ${c.kmAirport} ק״מ (~${c.etaAirportMin} דק׳ לנתב״ג)</div>
+                  </div>
+                  <button onclick="window.primeApp.selectQuickRoute('${c.id}', 'to_airport')"
+                    class="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs px-3.5 py-2.5 rounded-xl shadow-sm shrink-0 cursor-pointer">
+                    הזמן עכשיו 🚕
+                  </button>
+                </div>
+                <div class="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center text-xs">
+                  <div>
+                    <span class="text-[10px] text-slate-500 block">☀️ יום לנתב״ג</span>
+                    <span class="font-black text-emerald-700 text-sm">₪${c.airportDay}</span>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-slate-500 block">🌙 לילה/סופ״ש</span>
+                    <span class="font-black text-indigo-900 text-sm">₪${c.airportNight}</span>
+                  </div>
+                  <div>
+                    <span class="text-[10px] text-slate-500 block">🚐 6 מקומות</span>
+                    <span class="font-black text-slate-800 text-sm">₪${minivanPrice}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+
+        <!-- Desktop 7-Column Pricelist Table (lg+) -->
+        <div class="hidden lg:block bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-right border-collapse">
               <thead>
@@ -2283,20 +2367,20 @@
         </div>
 
         <!-- Admin Sub-navigation -->
-        <div class="flex flex-wrap gap-2 mb-6">
+        <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 mb-6">
           ${[
-            { id: 'orders', label: '📲 יומן נסיעות ושיבוץ נהגים', count: orders.length },
-            { id: 'drivers', label: '🚖 מאגר נהגים וזמינות חיה', count: drivers.length },
-            { id: 'marketing', label: '🎬 סטודיו פרסום, סרטונים, פוסטים ודגל לרכב', count: 8 },
-            { id: 'analytics', label: '📊 ניתוחים ודוחות רווחיות (BI)' },
-            { id: 'pricing', label: '💰 עריכת מחירון ואחוזי עמלה' },
+            { id: 'orders', label: '📲 יומן נסיעות ושיבוץ', count: orders.length },
+            { id: 'drivers', label: '🚖 מאגר נהגים חי', count: drivers.length },
+            { id: 'marketing', label: '🎬 סרטונים, פוסטים ודגל', count: 8 },
+            { id: 'analytics', label: '📊 ניתוחים ודוחות רווח' },
+            { id: 'pricing', label: '💰 מחירון ואחוזי עמלה' },
             { id: 'branding', label: '🎨 מיתוג ולוגו' },
-            { id: 'auth_servers', label: '🔐 שותפים, ענן AWS ושרתי SMS' }
+            { id: 'auth_servers', label: '🔐 שותפים וענן AWS' }
           ].map(tab => `
             <button onclick="window.primeApp.setAdminTab('${tab.id}')"
-              class="px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition flex items-center gap-2 cursor-pointer ${state.adminTab === tab.id ? 'bg-slate-900 text-amber-400 shadow-md' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}">
-              <span>${tab.label}</span>
-              ${tab.count !== undefined ? `<span class="bg-amber-400 text-slate-950 text-xs font-black px-2 py-0.5 rounded-full">${tab.count}</span>` : ''}
+              class="px-3 sm:px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-extrabold transition flex items-center justify-between sm:justify-start gap-1.5 cursor-pointer ${state.adminTab === tab.id ? 'bg-slate-900 text-amber-400 shadow-md' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'}">
+              <span class="truncate">${tab.label}</span>
+              ${tab.count !== undefined ? `<span class="bg-amber-400 text-slate-950 text-[11px] font-black px-1.5 py-0.5 rounded-full shrink-0">${tab.count}</span>` : ''}
             </button>
           `).join('')}
         </div>
@@ -2360,12 +2444,12 @@
           `).join('')}
         </div>
 
-        <div class="flex flex-wrap items-center gap-2.5">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
           <input type="text" value="${state.adminOrderSearch || ''}" placeholder="🔍 חפש לפי שם לקוח, טלפון, עיר או #הזמנה..."
             oninput="window.primeApp.setAdminOrderSearch(this.value)"
-            class="rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2 text-xs font-bold text-slate-900 min-w-[230px] focus:border-amber-500 focus:outline-none" />
+            class="w-full sm:w-64 rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-amber-500 focus:outline-none" />
           <button onclick="window.primeApp.exportOrdersCsv()"
-            class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shadow-sm cursor-pointer">
+            class="w-full sm:w-auto justify-center px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black flex items-center gap-1.5 shadow-sm cursor-pointer">
             <span>📊</span>
             <span>ייצוא דוח ל-Excel / CSV</span>
           </button>
@@ -2452,34 +2536,34 @@
               </div>
 
               <!-- 3-Step Driver Dispatch & Commission Actions -->
-              <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <div class="flex flex-wrap gap-2">
+              <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-2.5 pt-2">
+                <div class="flex flex-col sm:flex-row sm:flex-wrap gap-2 w-full sm:w-auto">
                   <button onclick="window.primeApp.broadcastOrderToDrivers('${order.id}')"
-                    class="bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer">
+                    class="w-full sm:w-auto justify-center bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold text-xs px-4 py-3 sm:py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer">
                     <span>📢</span>
                     <span>1. שלח מכרז לקבוצת נהגים (ללא טלפון לקוח)</span>
                   </button>
 
                   <button onclick="window.primeApp.sendFullOrderToWinningDriver('${order.id}')"
-                    class="bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer">
+                    class="w-full sm:w-auto justify-center bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs px-4 py-3 sm:py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer">
                     <span>🔐</span>
                     <span>2. שלח פרטי לקוח + Waze לנהג שזכה</span>
                   </button>
 
                   <button onclick="window.primeApp.confirmOrderToCustomer('${order.id}')"
-                    class="bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer">
+                    class="w-full sm:w-auto justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs px-4 py-3 sm:py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer">
                     <span>✨</span>
                     <span>3. שלח אישור שיבוץ ללקוח</span>
                   </button>
                 </div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 w-full sm:w-auto">
                   <button onclick="window.primeApp.toggleOrderPaid('${order.id}')"
-                    class="px-3.5 py-2 rounded-xl text-xs font-extrabold border transition cursor-pointer ${order.status === 'paid' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-sky-50 text-sky-900 border-sky-200 hover:bg-sky-100'}">
+                    class="flex-1 sm:flex-initial px-3.5 py-2.5 rounded-xl text-xs font-extrabold border transition cursor-pointer ${order.status === 'paid' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-sky-50 text-sky-900 border-sky-200 hover:bg-sky-100'}">
                     ${order.status === 'paid' ? '✅ העמלה שולמה בביט/פייבוקס' : `💸 סמן שקיבלת ₪${order.commissionAmount} בביט/פייבוקס`}
                   </button>
                   <button onclick="window.primeApp.deleteOrder('${order.id}')" title="מחק הזמנה"
-                    class="px-2.5 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer">
+                    class="px-3 py-2.5 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 cursor-pointer shrink-0">
                     🗑️
                   </button>
                 </div>

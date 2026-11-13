@@ -712,15 +712,15 @@ window.PRIME_TAXI_MARKETING = (function () {
           </div>
 
           <!-- Ready Copy Box for Video -->
-          <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 space-y-2">
-            <div class="flex items-center justify-between">
+          <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 space-y-2 overflow-hidden">
+            <div class="flex items-center justify-between gap-2">
               <span class="text-xs font-extrabold text-amber-400">📝 קריינות / טקסט מוכן לצירוף לסרטון ב-WhatsApp / Reels / TikTok:</span>
               <button onclick="window.primeApp.copyText(${JSON.stringify(vid.shareCaption).replace(/"/g, '&quot;')}, 'טקסט הסרטון הועתק ללוח!')"
-                class="px-3 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-xs cursor-pointer">
+                class="px-3 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-xs cursor-pointer shrink-0">
                 📋 העתק טקסט
               </button>
             </div>
-            <pre class="text-xs text-slate-200 whitespace-pre-wrap font-sans leading-relaxed">${vid.shareCaption}</pre>
+            <pre class="text-xs text-slate-200 whitespace-pre-wrap break-words overflow-x-hidden font-sans leading-relaxed">${vid.shareCaption}</pre>
           </div>
         </div>
 
@@ -863,7 +863,7 @@ window.PRIME_TAXI_MARKETING = (function () {
                   <div class="text-[11px] font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-200">
                     🎯 איפה לפרסם: ${post.targetWhere}
                   </div>
-                  <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200 text-xs text-slate-800 whitespace-pre-wrap max-h-52 overflow-y-auto leading-relaxed">${post.copyText}</div>
+                  <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200 text-xs text-slate-800 whitespace-pre-wrap break-words overflow-x-hidden max-h-52 overflow-y-auto leading-relaxed">${post.copyText}</div>
                 </div>
               </div>
 
@@ -943,43 +943,57 @@ window.PRIME_TAXI_MARKETING = (function () {
     `;
   }
 
+  function initAfterRender() {
+    if (activeSubTab === 'videos') {
+      const canvas = document.getElementById('primeMarketingVideoCanvas');
+      if (canvas && !isPlaying) drawVideoFrame(canvas, getSelectedVideo(), 1.2);
+    } else if (activeSubTab === 'car_branding') {
+      drawCarMerchCanvas();
+    }
+  }
+
+  function resolveVideoId(vidId) {
+    const aliasMap = {
+      cust_booking_15s: 'vid_cust_booking',
+      driver_login_claim: 'vid_driver_onboarding',
+      driver_bit_unlock: 'vid_driver_commission'
+    };
+    return aliasMap[vidId] || vidId || 'vid_cust_booking';
+  }
+
   function renderMarketingStudioView() {
     setTimeout(() => {
-      if (activeSubTab === 'videos') {
-        const canvas = document.getElementById('primeMarketingVideoCanvas');
-        if (canvas) drawVideoFrame(canvas, getSelectedVideo(), 1.2);
-      } else if (activeSubTab === 'car_branding') {
-        drawCarMerchCanvas();
-      }
+      initAfterRender();
     }, 30);
 
     return `
-      <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <section class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6 pb-28 lg:pb-12">
         <!-- Studio Hero -->
-        <div class="bg-gradient-to-l from-slate-950 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 sm:p-8 border border-amber-500/40 shadow-2xl">
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="bg-gradient-to-l from-slate-950 via-indigo-950 to-slate-900 text-white rounded-3xl p-4 sm:p-8 border border-amber-500/40 shadow-2xl">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div>
-              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-xs font-extrabold mb-2">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-300 text-[11px] sm:text-xs font-extrabold mb-2">
                 <span>🎬 מערך השיווק, הווידאו והמיתוג של פריים טקסי</span>
               </div>
-              <h1 class="text-2xl sm:text-3xl font-black">סטודיו פרסום, סרטוני הדרכה (לנהגים וללקוחות), פוסטים ודגל לרכב</h1>
-              <p class="text-slate-300 text-sm mt-1">
+              <h1 class="text-xl sm:text-3xl font-black leading-snug">סטודיו פרסום, סרטוני הדרכה (לנהגים וללקוחות), פוסטים ודגל לרכב</h1>
+              <p class="text-slate-300 text-xs sm:text-sm mt-1 leading-relaxed">
                 כל הכלים כדי להפוך את התחנה למותג המוניות המוביל בישראל: סרטוני וידאו מוכנים להורדה ולשיתוף, מעבדת עיצוב דגל לרכב ומדבקות QR, ופוסטים מוכנים לפרסום ב-WhatsApp ובפייסבוק.
               </p>
             </div>
           </div>
 
-          <!-- Sub-Tabs -->
-          <div class="flex flex-wrap gap-2 mt-6 pt-5 border-t border-slate-800">
+          <!-- Sub-Tabs (2x2 Grid on Mobile, Flex Row on Desktop) -->
+          <div class="grid grid-cols-2 lg:flex lg:flex-wrap gap-2 mt-4 sm:mt-6 pt-4 border-t border-slate-800">
             ${[
-              { id: 'videos', label: '🎬 סרטוני וידאו והדרכה (8 סרטונים ללקוח ולנהג)' },
-              { id: 'car_branding', label: '🚩 דגל לרכב, מגנט לדלת ומדבקת QR להדפסה' },
-              { id: 'posts', label: '📱 פוסטים מוכנים לפרסום (פייסבוק / אינסטגרם / WhatsApp)' },
-              { id: 'growth_ideas', label: '💡 6 רעיונות זהב להכפלת הזמנות ונהגים' }
+              { id: 'videos', shortLabel: '🎬 8 סרטוני וידאו', fullLabel: '🎬 סרטוני וידאו והדרכה (8 סרטונים ללקוח ולנהג)' },
+              { id: 'car_branding', shortLabel: '🚩 דגל לרכב ומדבקת QR', fullLabel: '🚩 דגל לרכב, מגנט לדלת ומדבקת QR להדפסה' },
+              { id: 'posts', shortLabel: '📱 פוסטים לפרסום', fullLabel: '📱 פוסטים מוכנים לפרסום (פייסבוק / WhatsApp)' },
+              { id: 'growth_ideas', shortLabel: '💡 6 רעיונות צמיחה', fullLabel: '💡 6 רעיונות זהב להכפלת הזמנות ונהגים' }
             ].map(tab => `
               <button onclick="window.PRIME_TAXI_MARKETING.setSubTab('${tab.id}')"
-                class="px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer ${activeSubTab === tab.id ? 'bg-amber-400 text-slate-950 shadow-lg' : 'bg-slate-900/90 text-slate-200 border border-slate-700 hover:bg-slate-800'}">
-                ${tab.label}
+                class="px-3 sm:px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-black transition cursor-pointer text-center ${activeSubTab === tab.id ? 'bg-amber-400 text-slate-950 shadow-lg' : 'bg-slate-900/90 text-slate-200 border border-slate-700 hover:bg-slate-800'}">
+                <span class="sm:hidden">${tab.shortLabel}</span>
+                <span class="hidden sm:inline">${tab.fullLabel}</span>
               </button>
             `).join('')}
           </div>
@@ -995,14 +1009,23 @@ window.PRIME_TAXI_MARKETING = (function () {
 
   return {
     renderMarketingStudioView,
+    renderView: renderMarketingStudioView,
+    initAfterRender,
     setSubTab(tabId) {
       stopVideoPlayback();
-      activeSubTab = tabId;
+      activeSubTab = tabId === 'merch' ? 'car_branding' : tabId;
       if (window.primeApp && window.primeApp.rerender) window.primeApp.rerender();
+      setTimeout(() => initAfterRender(), 40);
     },
     selectVideo(vidId) {
       stopVideoPlayback();
-      selectedVideoId = vidId;
+      selectedVideoId = resolveVideoId(vidId);
+      if (window.primeApp && window.primeApp.rerender) window.primeApp.rerender();
+      setTimeout(() => startVideoPlayback(), 60);
+    },
+    selectReel(vidId) {
+      stopVideoPlayback();
+      selectedVideoId = resolveVideoId(vidId);
       if (window.primeApp && window.primeApp.rerender) window.primeApp.rerender();
       setTimeout(() => startVideoPlayback(), 60);
     },
@@ -1019,10 +1042,12 @@ window.PRIME_TAXI_MARKETING = (function () {
     setMerchType(mType) {
       currentMerchType = mType;
       if (window.primeApp && window.primeApp.rerender) window.primeApp.rerender();
+      setTimeout(() => drawCarMerchCanvas(), 40);
     },
     setFlagTheme(themeId) {
       currentFlagTheme = themeId;
       if (window.primeApp && window.primeApp.rerender) window.primeApp.rerender();
+      setTimeout(() => drawCarMerchCanvas(), 40);
     },
     downloadMerch() {
       downloadMerchPng();

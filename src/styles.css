@@ -18,13 +18,39 @@
 html {
   scroll-behavior: smooth;
   font-family: 'Heebo', 'Rubik', -apple-system, BlinkMacSystemFont, sans-serif;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
   background-color: #f4f6fb;
   color: #0f172a;
   overflow-x: hidden;
+  position: relative;
+}
+
+#appHeader,
+#appMain,
+footer {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.grid > * {
+  min-width: 0;
+}
+
+pre, code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Custom Scrollbar */
@@ -145,4 +171,42 @@ body {
 .modal-backdrop {
   background-color: rgba(7, 11, 20, 0.78);
   backdrop-filter: blur(6px);
+}
+
+/* Hide scrollbars on horizontal mobile pill strips */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile-First Touch & iOS Safari Anti-Zoom Rules */
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="date"],
+  input[type="time"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  .hero-backdrop {
+    background-position: 65% center;
+  }
+}
+
+/* Safe area support for modern iPhones & Android gesture bars */
+.safe-bottom-bar {
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+canvas {
+  max-width: 100%;
+  height: auto;
+  touch-action: manipulation;
 }
